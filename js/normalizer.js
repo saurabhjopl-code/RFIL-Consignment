@@ -1,105 +1,58 @@
-const SELLER_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
-
-function clean(v) {
-  return v.toString().trim().toUpperCase().replace(/\s+/g, '');
-}
-
-function normalizeKey(k) {
-  return k.toLowerCase().replace(/\s+/g, ' ');
-}
-
-function getValue(row, keys) {
-  for (const k of Object.keys(row)) {
-    const nk = normalizeKey(k);
-    if (keys.some(x => nk.includes(x))) return row[k];
-  }
-  return '';
-}
-
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* Seller → Uniware map */
-  const sellerToUniware = {};
+  // --- Parse fixed CSVs into maps ---
+  const skuToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
-    const [s, u] = r.split(',');
-    if (s && u) sellerToUniware[clean(s)] = clean(u);
-  });
-
-  /* Uniware stock */
-  const uniwareStock = {};
-  sellerStock.forEach(r => {
-    const u = clean(getValue(r, ['sku code', 'sku']));
-    const st = Number(getValue(r, ['available', 'atp'])) || 0;
-    if (!u) return;
-    uniwareStock[u] = (uniwareStock[u] || 0) + st;
-  });
-
-  /* Sales (SUM) */
-  const salesMap = {};
-  sales.forEach(r => {
-    const s = clean(getValue(r, ['sku id', 'sku']));
-    const fc = getValue(r, ['location', 'warehouse']);
-    if (!s || !fc || fc === 'NA' || fc === 'NULL') return;
-
-    const u = sellerToUniware[s];
-    if (!u) return;
-
-    const g = Number(getValue(r, ['gross units'])) || 0;
-    const key = `${s}|${u}|${fc}`;
-    salesMap[key] = (salesMap[key] || 0) + g;
-  });
-
-  /* FBF Stock (SUM) */
-  const stockMap = {};
-  fbfStock.forEach(r => {
-    const s = clean(getValue(r, ['sku']));
-    const fc = getValue(r, ['warehouse', 'location']);
-    if (!s || !fc || fc === 'NA' || fc === 'NULL') return;
-
-    const u = sellerToUniware[s];
-    if (!u) return;
-
-    const st = Number(getValue(r, ['live'])) || 0;
-    const key = `${s}|${u}|${fc}`;
-    stockMap[key] = (stockMap[key] || 0) + st;
-  });
-
-  /* Build rows */
-  const rows = [];
-  const keys = new Set([...Object.keys(salesMap), ...Object.keys(stockMap)]);
-
-  keys.forEach(k => {
-    const [s, u, fc] = k.split('|');
-    const sale = salesMap[k] || 0;
-    const stock = stockMap[k] || 0;
-
-    // 🔴 REMOVE ZERO–ZERO ROWS
-    if (sale === 0 && stock === 0) return;
-
-    rows.push({
-      fc,
-      sellerSKU: s,
-      uniwareSKU: u,
-      gross30DSale: sale,
-      currentFCStock: stock,
-      sellerStock: uniwareStock[u] || 0
-    });
-  });
-
-  /* Momentum map (FBF only) */
-  const momentum = {};
-  rows.forEach(r => {
-    if (r.fc === SELLER_FC) return;
-    if (!momentum[r.uniwareSKU] || momentum[r.uniwareSKU].sale < r.gross30DSale) {
-      momentum[r.uniwareSKU] = { fc: r.fc, sale: r.gross30DSale };
+    const [sellerSKU, uniwareSKU] = r.split(',');
+    if (sellerSKU && uniwareSKU) {
+      skuToUniware[sellerSKU.trim()] = uniwareSKU.trim();
     }
   });
 
-  return rows.map(r => ({
-    ...r,
-    targetFC:
-      r.fc === SELLER_FC
-        ? momentum[r.uniwareSKU]?.fc || 'MANUAL'
-        : null
-  }));
+  const skuStatus = {};
+  fixedData.statusMap.split('\n').slice(1).forEach(r => {
+    const [sellerSKU, status] = r.split(',');
+    if (sellerSKU && status) {
+      skuStatus[sellerSKU.trim()] = status.trim();
+    }
+  });
+
+  // --- Seller stock map ---
+  const sellerStockMap = {};
+  sellerStock.forEach(r => {
+    sellerStockMap[r['Seller SKU']] = Number(r['Available Stock']) || 0;
+  });
+
+  // --- FBF stock map (SKU × FC) ---
+  const fbfStockMap = {};
+  fbfStock.forEach(r => {
+    const key = `${r['SKU']}|${r['Warehouse Id']}`;
+    fbfStockMap[key] = Number(r['Live on Website (FBF Stock)']) || 0;
+  });
+
+  // --- Build base working table from SALES ---
+  const working = [];
+
+  sales.forEach(r => {
+    const sku = r['SKU ID'];
+    const fc = r['Location Id'];
+
+    const key = `${sku}|${fc}`;
+
+    working.push({
+      fc,
+      sellerSKU: sku,
+
+      gross30DSale: Number(r['Gross Units']) || 0,
+      return30D: Number(r['Return Units']) || 0,
+
+      currentFCStock: fbfStockMap[key] || 0,
+      sellerStock: sellerStockMap[sku] || 0,
+
+      uniwareSKU: skuToUniware[sku] || '',
+      uniwareStatus: skuStatus[sku] || 'OPEN'
+    });
+  });
+
+  return working;
 }
