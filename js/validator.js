@@ -1,27 +1,30 @@
-// FINAL VALIDATOR — DOES NOT BLOCK EXECUTION
-// Column mismatches are logged, not thrown
-
-function logHeaders(fileName, row) {
-  console.warn(fileName + ' headers:', Object.keys(row));
+function hasColumns(row, requiredCols) {
+  return requiredCols.every(col => Object.prototype.hasOwnProperty.call(row, col));
 }
 
 export function validateSales(data) {
-  if (!data || !data.length) {
-    throw new Error('Sales file is empty');
+  const required = ['SKU ID', 'Location Id', 'Gross Units', 'Return Units'];
+  if (!hasColumns(data[0], required)) {
+    throw new Error(
+      'Sales file column mismatch. Required: ' + required.join(', ')
+    );
   }
-  logHeaders('Sales', data[0]);
 }
 
 export function validateFBFStock(data) {
-  if (!data || !data.length) {
-    throw new Error('FBF Stock file is empty');
+  const required = ['Warehouse Id', 'SKU', 'Live on Website (FBF Stock)'];
+  if (!hasColumns(data[0], required)) {
+    throw new Error(
+      'FBF Stock file column mismatch. Required: ' + required.join(', ')
+    );
   }
-  logHeaders('FBF Stock', data[0]);
 }
 
 export function validateSellerStock(data) {
-  if (!data || !data.length) {
-    throw new Error('Seller Stock file is empty');
+  const required = ['Seller SKU', 'Available Stock'];
+  if (!hasColumns(data[0], required)) {
+    throw new Error(
+      'Seller Stock file column mismatch. Required: ' + required.join(', ')
+    );
   }
-  logHeaders('Seller Stock', data[0]);
 }
