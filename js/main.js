@@ -1,7 +1,6 @@
 import { loadFixedCSVs } from './mappingLogic.js';
 import { loadFile } from './fileLoader.js';
 import { parseFile } from './parser.js';
-import { validateSales, validateFBFStock, validateSellerStock } from './validator.js';
 import { normalizeData } from './normalizer.js';
 import { applyStockCover } from './stockCoverLogic.js';
 import { decide } from './decisionEngine.js';
@@ -25,43 +24,32 @@ async function init() {
 }
 
 generateBtn.onclick = async () => {
-  try {
-    statusDiv.innerText = 'Processing...';
+  statusDiv.innerText = 'Processing...';
 
-    const sales = parseFile(await loadFile(salesFile.files[0]));
-    const fbf = parseFile(await loadFile(fbfFile.files[0]));
-    const seller = parseFile(await loadFile(sellerFile.files[0]));
+  const sales = parseFile(await loadFile(salesFile.files[0]));
+  const fbf = parseFile(await loadFile(fbfFile.files[0]));
+  const uniware = parseFile(await loadFile(sellerFile.files[0]));
 
-    validateSales(sales);
-    validateFBFStock(fbf);
-    validateSellerStock(seller);
+  const base = normalizeData(
+    { sales, fbfStock: fbf, sellerStock: uniware },
+    fixedData
+  );
 
-    const base = normalizeData(
-      { sales, fbfStock: fbf, sellerStock: seller },
-      fixedData
-    );
+  finalData = base
+    .map(r => {
+      const sc = applyStockCover(r);
+      const decision = decide(sc);
+      const qty = calculateQuantities(sc, decision);
+      return {
+        ...qty,
+        decision,
+        remarks: getRemarks(qty, decision)
+      };
+    })
+    .filter(r => !(r.currentFCStock === 0 && r.gross30DSale === 0));
 
-    finalData = base
-      .map(r => {
-        const sc = applyStockCover(r);
-        const decision = decide(sc);
-        const qty = calculateQuantities(sc, decision);
-        return {
-          ...qty,
-          decision,
-          remarks: getRemarks(qty, decision)
-        };
-      })
-      .filter(r => !(r.currentFCStock === 0 && r.gross30DSale === 0));
-
-    renderFCTables(finalData);
-
-    statusDiv.innerText = `Report generated. ${finalData.length} rows shown.`;
-
-  } catch (err) {
-    alert(err.message);
-    statusDiv.innerText = 'ERROR: ' + err.message;
-  }
+  renderFCTables(finalData);
+  statusDiv.innerText = `Report generated. ${finalData.length} rows.`;
 };
 
 document.getElementById('exportShipment').onclick = () => exportShipment(finalData);
