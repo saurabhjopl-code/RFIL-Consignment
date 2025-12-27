@@ -19,16 +19,12 @@ export function renderFCTables(data) {
     header.style.padding = '8px';
     header.innerText = `FC: ${fc} (Rows: ${fcMap[fc].length})`;
 
-    const tableWrapper = document.createElement('div');
-    tableWrapper.style.display = 'none';
-
-    header.onclick = () => {
-      tableWrapper.style.display =
-        tableWrapper.style.display === 'none' ? 'block' : 'none';
-    };
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'none';
+    header.onclick = () =>
+      wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
 
     const table = document.createElement('table');
-
     const headers = [
       'SKU',
       'Current FC Stock',
@@ -38,6 +34,7 @@ export function renderFCTables(data) {
       'Decision',
       'Send Qty',
       'Recall Qty',
+      'Recommended FC',
       'Remarks'
     ];
 
@@ -52,46 +49,31 @@ export function renderFCTables(data) {
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-
     fcMap[fc].forEach(r => {
       const tr = document.createElement('tr');
-
-      tr.appendChild(cell(r.sellerSKU));
-      tr.appendChild(cell(r.currentFCStock));
-      tr.appendChild(cell(r.sellerStock));
-      tr.appendChild(cell(r.gross30DSale));
-      tr.appendChild(cell(r.stockCover));
-
-      const decisionCell = cell(r.decision);
-      if (r.decision === 'SEND') {
-        decisionCell.classList.add('decision-send');
-      }
-      tr.appendChild(decisionCell);
-
-      tr.appendChild(cell(r.sendQty));
-
-      const recallCell = cell(r.recallQty);
-      if (r.decision === 'DO NOT SEND' && r.recallQty > 0) {
-        recallCell.classList.add('recall-blocked');
-      }
-      tr.appendChild(recallCell);
-
-      tr.appendChild(cell(r.remarks));
-
+      [
+        r.sellerSKU,
+        r.currentFCStock,
+        r.sellerStock,
+        r.gross30DSale,
+        r.stockCover,
+        r.decision,
+        r.sendQty,
+        r.recallQty,
+        r.recommendedFC,
+        r.remarks
+      ].forEach(v => {
+        const td = document.createElement('td');
+        td.innerText = v;
+        tr.appendChild(td);
+      });
       tbody.appendChild(tr);
     });
 
     table.appendChild(tbody);
-    tableWrapper.appendChild(table);
-
+    wrapper.appendChild(table);
     section.appendChild(header);
-    section.appendChild(tableWrapper);
+    section.appendChild(wrapper);
     container.appendChild(section);
   });
-}
-
-function cell(val) {
-  const td = document.createElement('td');
-  td.innerText = val;
-  return td;
 }
