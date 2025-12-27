@@ -34,44 +34,54 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     uniwareStock[u] = (uniwareStock[u] || 0) + st;
   });
 
-  /* Sales */
+  /* Sales (SUM) */
   const salesMap = {};
   sales.forEach(r => {
     const s = clean(getValue(r, ['sku id', 'sku']));
     const fc = getValue(r, ['location', 'warehouse']);
-    if (!s || !fc) return;
+    if (!s || !fc || fc === 'NA' || fc === 'NULL') return;
+
     const u = sellerToUniware[s];
     if (!u) return;
+
     const g = Number(getValue(r, ['gross units'])) || 0;
     const key = `${s}|${u}|${fc}`;
     salesMap[key] = (salesMap[key] || 0) + g;
   });
 
-  /* FBF stock */
+  /* FBF Stock (SUM) */
   const stockMap = {};
   fbfStock.forEach(r => {
     const s = clean(getValue(r, ['sku']));
     const fc = getValue(r, ['warehouse', 'location']);
-    if (!s || !fc) return;
+    if (!s || !fc || fc === 'NA' || fc === 'NULL') return;
+
     const u = sellerToUniware[s];
     if (!u) return;
+
     const st = Number(getValue(r, ['live'])) || 0;
     const key = `${s}|${u}|${fc}`;
     stockMap[key] = (stockMap[key] || 0) + st;
   });
 
-  /* Build base rows */
+  /* Build rows */
   const rows = [];
   const keys = new Set([...Object.keys(salesMap), ...Object.keys(stockMap)]);
 
   keys.forEach(k => {
     const [s, u, fc] = k.split('|');
+    const sale = salesMap[k] || 0;
+    const stock = stockMap[k] || 0;
+
+    // 🔴 REMOVE ZERO–ZERO ROWS
+    if (sale === 0 && stock === 0) return;
+
     rows.push({
       fc,
       sellerSKU: s,
       uniwareSKU: u,
-      gross30DSale: salesMap[k] || 0,
-      currentFCStock: stockMap[k] || 0,
+      gross30DSale: sale,
+      currentFCStock: stock,
       sellerStock: uniwareStock[u] || 0
     });
   });
@@ -85,12 +95,11 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     }
   });
 
-  /* Add target FC */
   return rows.map(r => ({
     ...r,
     targetFC:
       r.fc === SELLER_FC
         ? momentum[r.uniwareSKU]?.fc || 'MANUAL'
-        : ''
+        : null
   }));
 }
