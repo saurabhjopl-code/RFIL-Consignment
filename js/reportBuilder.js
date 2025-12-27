@@ -32,7 +32,8 @@ export function renderFCTables(data) {
 
     const headers = [
       'SKU',
-      'Current Stock',
+      'Current FC Stock',
+      'Uniware Stock',
       '30D Sale',
       'Stock Cover',
       'Decision',
@@ -58,6 +59,7 @@ export function renderFCTables(data) {
       [
         r.sellerSKU,
         r.currentFCStock,
+        r.sellerStock,      // Uniware Stock
         r.gross30DSale,
         r.stockCover,
         r.decision,
