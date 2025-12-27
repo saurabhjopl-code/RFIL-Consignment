@@ -1,32 +1,36 @@
 function normalizeKey(key) {
-  return key.toLowerCase().replace(/\s+/g, '');
+  return key.toString().toLowerCase().replace(/\s+/g, '');
 }
 
-function get(row, keywords) {
+function get(row, keys) {
   for (const k of Object.keys(row)) {
     const nk = normalizeKey(k);
-    if (keywords.some(w => nk.includes(w))) return row[k];
+    if (keys.some(x => nk.includes(x))) return row[k];
   }
   return '';
 }
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* Seller → Uniware SKU */
+  /* ---------- Seller → Uniware SKU MAP ---------- */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
     const [seller, uniware] = r.split(',');
-    if (seller && uniware) sellerToUniware[seller.trim()] = uniware.trim();
+    if (seller && uniware) {
+      sellerToUniware[seller.trim()] = uniware.trim();
+    }
   });
 
-  /* Uniware Status / Remark */
+  /* ---------- Uniware Remark Map ---------- */
   const remarkMap = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
     const [uniwareSKU, remark] = r.split(',');
-    if (uniwareSKU && remark) remarkMap[uniwareSKU.trim()] = remark.trim();
+    if (uniwareSKU && remark) {
+      remarkMap[uniwareSKU.trim()] = remark.trim();
+    }
   });
 
-  /* Uniware Stock */
+  /* ---------- Uniware Stock (SUM ATP) ---------- */
   const uniwareStock = {};
   sellerStock.forEach(r => {
     const sku = get(r, ['skucode']);
@@ -35,32 +39,32 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     uniwareStock[sku] = (uniwareStock[sku] || 0) + qty;
   });
 
-  /* FBF Stock */
+  /* ---------- FBF Stock (v1.2 logic – DO NOT CHANGE) ---------- */
   const fbfMap = {};
   fbfStock.forEach(r => {
-    const sku = get(r, ['sku']);
+    const sellerSKU = get(r, ['sku']);
     const fc = get(r, ['warehouse']);
     const qty = Number(get(r, ['live'])) || 0;
-    if (!sku || !fc) return;
-    const key = `${sku}||${fc}`;
+    if (!sellerSKU || !fc) return;
+    const key = `${sellerSKU}||${fc}`;
     fbfMap[key] = (fbfMap[key] || 0) + qty;
   });
 
-  /* Sales */
+  /* ---------- Sales (v1.2 logic – DO NOT CHANGE) ---------- */
   const salesMap = {};
   sales.forEach(r => {
-    const sku = get(r, ['skuid']);
+    const sellerSKU = get(r, ['skuid']);
     const fc = get(r, ['location']);
     const qty = Number(get(r, ['grossunits'])) || 0;
     const ret = Number(get(r, ['returnunits'])) || 0;
-    if (!sku || !fc) return;
-    const key = `${sku}||${fc}`;
+    if (!sellerSKU || !fc) return;
+    const key = `${sellerSKU}||${fc}`;
     if (!salesMap[key]) salesMap[key] = { gross: 0, ret: 0 };
     salesMap[key].gross += qty;
     salesMap[key].ret += ret;
   });
 
-  /* Build Working Data */
+  /* ---------- Build Working Data (v1.2 preserved) ---------- */
   const working = [];
 
   Object.keys(fbfMap).forEach(key => {
@@ -71,10 +75,13 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
       fc,
       sellerSKU,
       uniwareSKU,
+
       gross30DSale: salesMap[key]?.gross || 0,
       return30D: salesMap[key]?.ret || 0,
+
       currentFCStock: fbfMap[key],
       sellerStock: uniwareStock[uniwareSKU] || 0,
+
       uniwareRemark: remarkMap[uniwareSKU] || ''
     });
   });
