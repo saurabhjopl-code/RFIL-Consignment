@@ -1,6 +1,25 @@
+function normalizeKey(key) {
+  return key
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[\(\)\-]/g, '');
+}
+
+function getValue(row, aliases) {
+  const keys = Object.keys(row);
+  for (const k of keys) {
+    if (aliases.includes(normalizeKey(k))) {
+      return row[k];
+    }
+  }
+  return '';
+}
+
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  // --- Parse fixed CSVs into maps ---
+  /* ---------- FIXED CSV MAPS ---------- */
   const skuToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
     const [sellerSKU, uniwareSKU] = r.split(',');
@@ -17,36 +36,48 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     }
   });
 
-  // --- Seller stock map ---
+  /* ---------- SELLER STOCK MAP (FIXED) ---------- */
   const sellerStockMap = {};
   sellerStock.forEach(r => {
-    sellerStockMap[r['Seller SKU']] = Number(r['Available Stock']) || 0;
+    const sku = getValue(r, ['seller sku', 'sku']);
+    const stock = getValue(r, [
+      'available stock',
+      'available qty',
+      'available quantity',
+      'current stock',
+      'stock available'
+    ]);
+    sellerStockMap[sku] = Number(stock) || 0;
   });
 
-  // --- FBF stock map (SKU × FC) ---
+  /* ---------- FBF STOCK MAP ---------- */
   const fbfStockMap = {};
   fbfStock.forEach(r => {
-    const key = `${r['SKU']}|${r['Warehouse Id']}`;
-    fbfStockMap[key] = Number(r['Live on Website (FBF Stock)']) || 0;
+    const sku = getValue(r, ['sku']);
+    const fc = getValue(r, ['warehouse id']);
+    const stock = getValue(r, [
+      'live on website fbf stock',
+      'live on website stock',
+      'live on website'
+    ]);
+    fbfStockMap[`${sku}|${fc}`] = Number(stock) || 0;
   });
 
-  // --- Build base working table from SALES ---
+  /* ---------- BUILD WORKING DATA ---------- */
   const working = [];
 
   sales.forEach(r => {
-    const sku = r['SKU ID'];
-    const fc = r['Location Id'];
-
-    const key = `${sku}|${fc}`;
+    const sku = getValue(r, ['sku id']);
+    const fc = getValue(r, ['location id']);
 
     working.push({
       fc,
       sellerSKU: sku,
 
-      gross30DSale: Number(r['Gross Units']) || 0,
-      return30D: Number(r['Return Units']) || 0,
+      gross30DSale: Number(getValue(r, ['gross units'])) || 0,
+      return30D: Number(getValue(r, ['return units'])) || 0,
 
-      currentFCStock: fbfStockMap[key] || 0,
+      currentFCStock: fbfStockMap[`${sku}|${fc}`] || 0,
       sellerStock: sellerStockMap[sku] || 0,
 
       uniwareSKU: skuToUniware[sku] || '',
