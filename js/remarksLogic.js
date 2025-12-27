@@ -1,7 +1,7 @@
-export function getRemarks(row, decision) {
+export function getRemarks(row) {
 
-  // 🔴 CLOSED SKU REMARK
-  if (row.uniwareRemark && row.uniwareRemark.toLowerCase().includes('closed')) {
+  if (row.uniwareRemark &&
+      row.uniwareRemark.toLowerCase().includes('closed')) {
     return 'Closed SKU';
   }
 
