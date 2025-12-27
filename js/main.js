@@ -37,9 +37,9 @@ generateBtn.addEventListener('click', async () => {
 
     statusDiv.innerText = 'Parsing files...';
 
-    parsedData.sales = parseFile(salesRaw, 'Sales');
-    parsedData.fbfStock = parseFile(fbfRaw, 'FBF Stock');
-    parsedData.sellerStock = parseFile(sellerRaw, 'Seller Stock');
+    parsedData.sales = parseFile(salesRaw);
+    parsedData.fbfStock = parseFile(fbfRaw);
+    parsedData.sellerStock = parseFile(sellerRaw);
 
     statusDiv.innerText = 'Validating columns...';
 
@@ -47,13 +47,15 @@ generateBtn.addEventListener('click', async () => {
     validateFBFStock(parsedData.fbfStock);
     validateSellerStock(parsedData.sellerStock);
 
-    console.log('✅ Parsed & Validated Data:', parsedData);
-    statusDiv.innerText = 'Phase 2 complete. Data validated successfully.';
+    console.log('PARSED & VALIDATED DATA:', parsedData);
+    console.log('FIXED CSV DATA:', fixedData);
+
+    statusDiv.innerText = 'Phase 2 completed successfully.';
 
   } catch (err) {
     console.error(err);
-    statusDiv.innerText = '❌ Error: ' + err.message;
     alert(err.message);
+    statusDiv.innerText = 'ERROR: ' + err.message;
   }
 });
 
