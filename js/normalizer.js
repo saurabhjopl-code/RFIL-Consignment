@@ -1,157 +1,113 @@
-const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
-
-/* ===============================
-   SKU NORMALIZATION
-   =============================== */
-function normalizeSKU(val) {
-  if (!val) return '';
-  return val
+function normalizeKey(key) {
+  return key
     .toString()
     .trim()
-    .toUpperCase()
-    .replace(/[\u2010-\u2015\u2212]/g, '-')
-    .replace(/\u00A0/g, '')
-    .replace(/\s+/g, '');
-}
-
-/* ===============================
-   HEADER NORMALIZATION (CRITICAL)
-   =============================== */
-function normalizeHeader(val) {
-  return val
-    .toString()
     .toLowerCase()
-    .replace(/[\s\u00A0]+/g, '')   // remove ALL whitespace (incl unicode)
-    .replace(/[()]/g, '');
+    .replace(/\s+/g, ' ')
+    .replace(/[\(\)\-]/g, '');
 }
 
-function findColumn(row, mustContainAll) {
+function getValue(row, keywords) {
   for (const k of Object.keys(row)) {
-    const nk = normalizeHeader(k);
-    if (mustContainAll.every(x => nk.includes(x))) {
-      return k;
+    const nk = normalizeKey(k);
+    if (keywords.some(w => nk.includes(w))) {
+      return row[k];
     }
   }
-  return null;
+  return '';
 }
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* ===============================
-     Seller → Uniware SKU mapping
-     =============================== */
-  const sellerToUniware = {};
-  fixedData.skuMap.split('\n').slice(1).forEach(r => {
-    const [seller, uniware] = r.split(',');
-    if (!seller || !uniware) return;
-    sellerToUniware[normalizeSKU(seller)] = normalizeSKU(uniware);
-  });
-
-  /* ===============================
-     Uniware Remark
-     =============================== */
-  const remarkMap = {};
+  /* ---------- UNIWARE STATUS MAP ---------- */
+  const skuStatus = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
-    const [sku, remark] = r.split(',');
-    if (!sku || !remark) return;
-    remarkMap[normalizeSKU(sku)] = remark.trim();
+    const [uniwareSKU, status] = r.split(',');
+    if (uniwareSKU && status) {
+      skuStatus[uniwareSKU.trim()] = status.trim();
+    }
   });
 
-  /* ===============================
-     ✅ UNIWARE STOCK (FINAL FIX)
-     =============================== */
-  const uniwareStock = {};
-
+  /* ---------- UNIWARE STOCK (USE TOTAL INVENTORY ONLY) ---------- */
+  const sellerStockMap = {};
   sellerStock.forEach(r => {
-    const skuCol = findColumn(r, ['skucode']);
-    const stockCol = findColumn(r, ['total', 'inventory']); // ONLY THIS
+    const sku = getValue(r, ['sku code', 'sku']);
+    const stock = Number(getValue(r, ['total inventory'])) || 0;
 
-    if (!skuCol || !stockCol) return;
+    if (!sku) return;
 
-    const uniwareSKU = normalizeSKU(r[skuCol]);
-    const qty = Number(r[stockCol]) || 0;
-
-    if (!uniwareSKU) return;
-
-    uniwareStock[uniwareSKU] =
-      (uniwareStock[uniwareSKU] || 0) + qty;
+    sellerStockMap[sku] = (sellerStockMap[sku] || 0) + stock;
   });
 
-  /* ===============================
-     FBF Stock
-     =============================== */
-  const fbfMap = {};
+  /* ---------- FBF STOCK (SUM Live on Website) ---------- */
+  const fbfStockMap = {};
   fbfStock.forEach(r => {
-    const skuCol = findColumn(r, ['sku']);
-    const fcCol = findColumn(r, ['warehouse']);
-    const liveCol = findColumn(r, ['live']);
+    const sku = getValue(r, ['sku']);
+    const fc = getValue(r, ['warehouse', 'location']);
+    const stock = Number(getValue(r, ['live'])) || 0;
 
-    if (!skuCol || !fcCol || !liveCol) return;
+    if (!sku || !fc) return;
 
-    const sellerSKU = normalizeSKU(r[skuCol]);
-    const fc = r[fcCol];
-    const qty = Number(r[liveCol]) || 0;
-
-    if (!sellerSKU || !fc) return;
-    const key = `${sellerSKU}||${fc}`;
-    fbfMap[key] = (fbfMap[key] || 0) + qty;
+    const key = `${sku}||${fc}`;
+    fbfStockMap[key] = (fbfStockMap[key] || 0) + stock;
   });
 
-  /* ===============================
-     Sales
-     =============================== */
+  /* ---------- SALES (SUM Gross Units) ---------- */
   const salesMap = {};
   sales.forEach(r => {
-    const skuCol = findColumn(r, ['skuid']);
-    const fcCol = findColumn(r, ['location']);
-    const qtyCol = findColumn(r, ['grossunits']);
-    const retCol = findColumn(r, ['returnunits']);
+    const sku = getValue(r, ['sku id', 'sku']);
+    const fc = getValue(r, ['location', 'warehouse']);
+    const gross = Number(getValue(r, ['gross units'])) || 0;
+    const ret = Number(getValue(r, ['return units'])) || 0;
 
-    if (!skuCol || !fcCol || !qtyCol) return;
+    if (!sku || !fc) return;
 
-    const sellerSKU = normalizeSKU(r[skuCol]);
-    const fc = r[fcCol];
-    const qty = Number(r[qtyCol]) || 0;
-    const ret = Number(r[retCol]) || 0;
+    const key = `${sku}||${fc}`;
+    if (!salesMap[key]) {
+      salesMap[key] = { gross: 0, returns: 0 };
+    }
 
-    if (!sellerSKU || !fc) return;
-    const key = `${sellerSKU}||${fc}`;
-
-    if (!salesMap[key]) salesMap[key] = { gross: 0, ret: 0 };
-    salesMap[key].gross += qty;
-    salesMap[key].ret += ret;
+    salesMap[key].gross += gross;
+    salesMap[key].returns += ret;
   });
 
-  /* ===============================
-     Build Working Dataset
-     =============================== */
+  /* ---------- BUILD FINAL UNIQUE DATASET ---------- */
   const working = [];
-  const keys = new Set([
-    ...Object.keys(fbfMap),
-    ...Object.keys(salesMap)
-  ]);
 
-  keys.forEach(key => {
-    const [sellerSKU, fc] = key.split('||');
-    const uniwareSKU = sellerToUniware[sellerSKU] || '';
-    const uniStock = uniwareStock[uniwareSKU] || 0;
-
-    let currentFCStock = fbfMap[key] || 0;
-
-    if (fc === UNIWARE_ONLY_FC) {
-      currentFCStock = uniStock;
-    }
+  Object.keys(salesMap).forEach(key => {
+    const [sku, fc] = key.split('||');
 
     working.push({
       fc,
-      sellerSKU,
-      uniwareSKU,
-      gross30DSale: salesMap[key]?.gross || 0,
-      return30D: salesMap[key]?.ret || 0,
-      currentFCStock,
-      sellerStock: uniStock,
-      uniwareRemark: remarkMap[uniwareSKU] || '',
-      recommendedFC: ''
+      sellerSKU: sku,
+
+      gross30DSale: salesMap[key].gross,
+      return30D: salesMap[key].returns,
+
+      currentFCStock: fbfStockMap[key] || 0,
+      sellerStock: sellerStockMap[sku] || 0,
+
+      uniwareStatus: skuStatus[sku] || 'OPEN'
+    });
+  });
+
+  /* ---------- INCLUDE FBF STOCK WITH NO SALES ---------- */
+  Object.keys(fbfStockMap).forEach(key => {
+    if (salesMap[key]) return;
+
+    const [sku, fc] = key.split('||');
+
+    working.push({
+      fc,
+      sellerSKU: sku,
+
+      gross30DSale: 0,
+      return30D: 0,
+
+      currentFCStock: fbfStockMap[key],
+      sellerStock: sellerStockMap[sku] || 0,
+
+      uniwareStatus: skuStatus[sku] || 'OPEN'
     });
   });
 
