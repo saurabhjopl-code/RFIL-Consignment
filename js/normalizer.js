@@ -17,7 +17,7 @@ function getVal(row, keywords) {
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
   /* ======================================================
-     1) SELLER → UNIWARE SKU MAP  (THE BRIDGE)
+     1) SELLER → UNIWARE SKU MAP
      ====================================================== */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
@@ -38,14 +38,14 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
   /* ======================================================
      3) UNIWARE STOCK (BY UNIWARE SKU)
-        SOURCE = Total Inventory (LOCKED)
+        SOURCE = Total Inventory
      ====================================================== */
-  const uniwareStock = {};
+  const uniwareStockMap = {};
   sellerStock.forEach(r => {
     const uSku = key(getVal(r, ['sku code', 'sku']));
     const qty = Number(getVal(r, ['total inventory'])) || 0;
     if (!uSku) return;
-    uniwareStock[uSku] = (uniwareStock[uSku] || 0) + qty;
+    uniwareStockMap[uSku] = (uniwareStockMap[uSku] || 0) + qty;
   });
 
   /* ======================================================
@@ -78,7 +78,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ======================================================
-     6) BUILD FINAL DATASET (CORRECT JOIN ORDER)
+     6) BUILD FINAL DATASET (KEY FIX HERE)
      ====================================================== */
   const out = [];
   const keys = new Set([
@@ -88,8 +88,6 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
   keys.forEach(k => {
     const [sellerSKU, fc] = k.split('||');
-
-    // 🔑 CRITICAL STEP: MAP FIRST
     const uniwareSKU = sellerToUniware[sellerSKU] || '';
 
     out.push({
@@ -101,7 +99,9 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
       return30D: salesMap[k]?.ret || 0,
 
       currentFCStock: fbfMap[k] || 0,
-      uniwareStock: uniwareStock[uniwareSKU] || 0,
+
+      // 🔴 CRITICAL: keep legacy property name
+      sellerStock: uniwareStockMap[uniwareSKU] || 0,
 
       uniwareStatus: uniwareStatus[uniwareSKU] || 'OPEN'
     });
