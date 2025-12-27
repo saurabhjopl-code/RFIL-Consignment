@@ -7,14 +7,12 @@ function normalizeKey(key) {
     .replace(/[\(\)\-]/g, '');
 }
 
-/**
- * Check if at least one alias exists in row headers
- */
 function hasColumnAlias(row, aliases) {
   const headers = Object.keys(row).map(normalizeKey);
   return aliases.some(a => headers.includes(normalizeKey(a)));
 }
 
+/* ---------- SALES VALIDATION ---------- */
 export function validateSales(data) {
   const row = data[0];
 
@@ -31,6 +29,7 @@ export function validateSales(data) {
   }
 }
 
+/* ---------- FBF STOCK VALIDATION ---------- */
 export function validateFBFStock(data) {
   const row = data[0];
 
@@ -51,12 +50,19 @@ export function validateFBFStock(data) {
   }
 }
 
+/* ---------- SELLER STOCK VALIDATION ---------- */
 export function validateSellerStock(data) {
   const row = data[0];
 
   if (
-    !hasColumnAlias(row, ['seller sku']) ||
-    !hasColumnAlias(row, ['available stock'])
+    !hasColumnAlias(row, ['seller sku', 'sku']) ||
+    !hasColumnAlias(row, [
+      'available stock',
+      'available qty',
+      'available quantity',
+      'current stock',
+      'stock available'
+    ])
   ) {
     console.error('Seller headers found:', Object.keys(row));
     throw new Error(
