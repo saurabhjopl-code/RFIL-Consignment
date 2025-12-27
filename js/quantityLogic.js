@@ -2,19 +2,6 @@ const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
 
 export function calculateQuantities(row, decision) {
 
-  // CLOSED SKU → FULL RECALL (except Uniware-only FC)
-  if (
-    row.uniwareRemark &&
-    row.uniwareRemark.toLowerCase().includes('closed') &&
-    row.fc !== UNIWARE_ONLY_FC
-  ) {
-    return {
-      ...row,
-      sendQty: 0,
-      recallQty: row.currentFCStock
-    };
-  }
-
   let sendQty = 0;
   let recallQty = 0;
 
@@ -31,7 +18,7 @@ export function calculateQuantities(row, decision) {
     recallQty = Math.max(row.currentFCStock - row.targetStock, 0);
   }
 
-  // 🔴 No recall for Uniware-only FC
+  // 🔴 STEP-1 RULE: No recall for Uniware-only FC
   if (row.fc === UNIWARE_ONLY_FC) {
     recallQty = 0;
   }
