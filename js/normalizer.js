@@ -1,14 +1,25 @@
+function normalizeKey(key) {
+  return key
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[\(\)\-]/g, '');
+}
+
+function getValue(row, keywords) {
+  for (const k of Object.keys(row)) {
+    const nk = normalizeKey(k);
+    if (keywords.some(w => nk.includes(w))) {
+      return row[k];
+    }
+  }
+  return '';
+}
+
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  // --- Parse fixed CSVs into maps ---
-  const skuToUniware = {};
-  fixedData.skuMap.split('\n').slice(1).forEach(r => {
-    const [sellerSKU, uniwareSKU] = r.split(',');
-    if (sellerSKU && uniwareSKU) {
-      skuToUniware[sellerSKU.trim()] = uniwareSKU.trim();
-    }
-  });
-
+  /* ---------- UNIWARE STATUS MAP ---------- */
   const skuStatus = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
     const [sellerSKU, status] = r.split(',');
@@ -17,39 +28,85 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     }
   });
 
-  // --- Seller stock map ---
+  /* ---------- SELLER STOCK (SUM Available ATP) ---------- */
   const sellerStockMap = {};
   sellerStock.forEach(r => {
-    sellerStockMap[r['Seller SKU']] = Number(r['Available Stock']) || 0;
+    const sku = getValue(r, ['sku']);
+    const stock = Number(getValue(r, ['available', 'qty', 'stock'])) || 0;
+
+    if (!sku) return;
+
+    sellerStockMap[sku] = (sellerStockMap[sku] || 0) + stock;
   });
 
-  // --- FBF stock map (SKU × FC) ---
+  /* ---------- FBF STOCK (SUM Live on Website) ---------- */
   const fbfStockMap = {};
   fbfStock.forEach(r => {
-    const key = `${r['SKU']}|${r['Warehouse Id']}`;
-    fbfStockMap[key] = Number(r['Live on Website (FBF Stock)']) || 0;
+    const sku = getValue(r, ['sku']);
+    const fc = getValue(r, ['warehouse', 'location']);
+    const stock = Number(getValue(r, ['live'])) || 0;
+
+    if (!sku || !fc) return;
+
+    const key = `${sku}||${fc}`;
+    fbfStockMap[key] = (fbfStockMap[key] || 0) + stock;
   });
 
-  // --- Build base working table from SALES ---
+  /* ---------- SALES (SUM Gross Units) ---------- */
+  const salesMap = {};
+  sales.forEach(r => {
+    const sku = getValue(r, ['sku id', 'sku']);
+    const fc = getValue(r, ['location', 'warehouse']);
+    const gross = Number(getValue(r, ['gross units'])) || 0;
+    const ret = Number(getValue(r, ['return units'])) || 0;
+
+    if (!sku || !fc) return;
+
+    const key = `${sku}||${fc}`;
+    if (!salesMap[key]) {
+      salesMap[key] = { gross: 0, returns: 0 };
+    }
+
+    salesMap[key].gross += gross;
+    salesMap[key].returns += ret;
+  });
+
+  /* ---------- BUILD FINAL UNIQUE DATASET ---------- */
   const working = [];
 
-  sales.forEach(r => {
-    const sku = r['SKU ID'];
-    const fc = r['Location Id'];
-
-    const key = `${sku}|${fc}`;
+  Object.keys(salesMap).forEach(key => {
+    const [sku, fc] = key.split('||');
 
     working.push({
       fc,
       sellerSKU: sku,
 
-      gross30DSale: Number(r['Gross Units']) || 0,
-      return30D: Number(r['Return Units']) || 0,
+      gross30DSale: salesMap[key].gross,
+      return30D: salesMap[key].returns,
 
       currentFCStock: fbfStockMap[key] || 0,
       sellerStock: sellerStockMap[sku] || 0,
 
-      uniwareSKU: skuToUniware[sku] || '',
+      uniwareStatus: skuStatus[sku] || 'OPEN'
+    });
+  });
+
+  /* ---------- INCLUDE FBF STOCK WITH NO SALES ---------- */
+  Object.keys(fbfStockMap).forEach(key => {
+    if (salesMap[key]) return;
+
+    const [sku, fc] = key.split('||');
+
+    working.push({
+      fc,
+      sellerSKU: sku,
+
+      gross30DSale: 0,
+      return30D: 0,
+
+      currentFCStock: fbfStockMap[key],
+      sellerStock: sellerStockMap[sku] || 0,
+
       uniwareStatus: skuStatus[sku] || 'OPEN'
     });
   });
