@@ -42,8 +42,8 @@ generateBtn.onclick = async () => {
     );
 
     finalData = base
-      .map(row => {
-        const sc = applyStockCover(row);
+      .map(r => {
+        const sc = applyStockCover(r);
         const decision = decide(sc);
         const qty = calculateQuantities(sc, decision);
         return {
@@ -52,21 +52,18 @@ generateBtn.onclick = async () => {
           remarks: getRemarks(qty, decision)
         };
       })
-      // 🔴 REMOVE DEAD ROWS
       .filter(r => !(r.currentFCStock === 0 && r.gross30DSale === 0));
 
     renderFCTables(finalData);
 
-    statusDiv.innerText = `Report generated. ${finalData.length} active rows shown.`;
+    statusDiv.innerText = `Report generated. ${finalData.length} rows shown.`;
 
   } catch (err) {
-    console.error(err);
     alert(err.message);
     statusDiv.innerText = 'ERROR: ' + err.message;
   }
 };
 
-// EXPORTS
 document.getElementById('exportShipment').onclick = () => exportShipment(finalData);
 document.getElementById('exportRecall').onclick = () => exportRecall(finalData);
 document.getElementById('exportWorking').onclick = () => exportWholeWorking(finalData);
