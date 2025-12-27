@@ -7,6 +7,10 @@ import {
   validateSellerStock
 } from './validator.js';
 import { normalizeData } from './normalizer.js';
+import { applyStockCover } from './stockCoverLogic.js';
+import { decide } from './decisionEngine.js';
+import { calculateQuantities } from './quantityLogic.js';
+import { getRemarks } from './remarksLogic.js';
 
 const salesInput = document.getElementById('salesFile');
 const fbfInput = document.getElementById('fbfStockFile');
@@ -15,8 +19,8 @@ const generateBtn = document.getElementById('generateBtn');
 const statusDiv = document.getElementById('status');
 
 let fixedData = {};
-let parsedData = {};
 let workingData = [];
+let finalData = [];
 
 async function init() {
   statusDiv.innerText = 'Loading fixed reference files...';
@@ -26,28 +30,38 @@ async function init() {
 
 generateBtn.addEventListener('click', async () => {
   try {
-    if (!salesInput.files[0] || !fbfInput.files[0] || !sellerInput.files[0]) {
-      alert('Please upload all required files');
-      return;
-    }
+    statusDiv.innerText = 'Processing...';
 
-    statusDiv.innerText = 'Reading & parsing files...';
+    const sales = parseFile(await loadFile(salesInput.files[0]));
+    const fbf = parseFile(await loadFile(fbfInput.files[0]));
+    const seller = parseFile(await loadFile(sellerInput.files[0]));
 
-    parsedData.sales = parseFile(await loadFile(salesInput.files[0]));
-    parsedData.fbfStock = parseFile(await loadFile(fbfInput.files[0]));
-    parsedData.sellerStock = parseFile(await loadFile(sellerInput.files[0]));
+    validateSales(sales);
+    validateFBFStock(fbf);
+    validateSellerStock(seller);
 
-    validateSales(parsedData.sales);
-    validateFBFStock(parsedData.fbfStock);
-    validateSellerStock(parsedData.sellerStock);
+    workingData = normalizeData(
+      { sales, fbfStock: fbf, sellerStock: seller },
+      fixedData
+    );
 
-    statusDiv.innerText = 'Normalizing & joining data...';
+    finalData = workingData.map(row => {
+      const withSC = applyStockCover(row);
+      const decision = decide(withSC);
+      const withQty = calculateQuantities(withSC, decision);
+      const remarks = getRemarks(withQty, decision);
 
-    workingData = normalizeData(parsedData, fixedData);
+      return {
+        ...withQty,
+        decision,
+        remarks
+      };
+    });
 
-    console.log('FINAL WORKING DATA (Phase 3):', workingData);
+    console.log('FINAL DATA (Phase 4):', finalData);
 
-    statusDiv.innerText = `Phase 3 complete. ${workingData.length} rows created.`;
+    statusDiv.innerText =
+      `Phase 4 complete. ${finalData.length} rows processed.`;
 
   } catch (err) {
     console.error(err);
