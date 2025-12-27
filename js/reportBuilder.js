@@ -2,7 +2,6 @@ export function renderFCTables(data) {
   const container = document.getElementById('tableContainer');
   container.innerHTML = '';
 
-  // Group by FC
   const fcMap = {};
   data.forEach(r => {
     if (!fcMap[r.fc]) fcMap[r.fc] = [];
@@ -56,21 +55,29 @@ export function renderFCTables(data) {
 
     fcMap[fc].forEach(r => {
       const tr = document.createElement('tr');
-      [
-        r.sellerSKU,
-        r.currentFCStock,
-        r.sellerStock,      // Uniware Stock
-        r.gross30DSale,
-        r.stockCover,
-        r.decision,
-        r.sendQty,
-        r.recallQty,
-        r.remarks
-      ].forEach(val => {
-        const td = document.createElement('td');
-        td.innerText = val;
-        tr.appendChild(td);
-      });
+
+      tr.appendChild(cell(r.sellerSKU));
+      tr.appendChild(cell(r.currentFCStock));
+      tr.appendChild(cell(r.sellerStock));
+      tr.appendChild(cell(r.gross30DSale));
+      tr.appendChild(cell(r.stockCover));
+
+      const decisionCell = cell(r.decision);
+      if (r.decision === 'SEND') {
+        decisionCell.classList.add('decision-send');
+      }
+      tr.appendChild(decisionCell);
+
+      tr.appendChild(cell(r.sendQty));
+
+      const recallCell = cell(r.recallQty);
+      if (r.decision === 'DO NOT SEND' && r.recallQty > 0) {
+        recallCell.classList.add('recall-blocked');
+      }
+      tr.appendChild(recallCell);
+
+      tr.appendChild(cell(r.remarks));
+
       tbody.appendChild(tr);
     });
 
@@ -81,4 +88,10 @@ export function renderFCTables(data) {
     section.appendChild(tableWrapper);
     container.appendChild(section);
   });
+}
+
+function cell(val) {
+  const td = document.createElement('td');
+  td.innerText = val;
+  return td;
 }
