@@ -1,3 +1,5 @@
+const SELLER_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
+
 export function renderTable(data) {
   const container = document.getElementById('tableContainer');
   container.innerHTML = '';
@@ -12,11 +14,11 @@ export function renderTable(data) {
 
   Object.keys(groups).forEach(fc => {
     const header = document.createElement('div');
-    header.innerText = `FC: ${fc} (Rows: ${groups[fc].length})`;
     header.style.fontWeight = 'bold';
     header.style.cursor = 'pointer';
     header.style.padding = '6px';
     header.style.background = '#eee';
+    header.innerText = `FC: ${fc} (Rows: ${groups[fc].length})`;
 
     const wrapper = document.createElement('div');
     wrapper.style.display = 'none';
@@ -24,6 +26,8 @@ export function renderTable(data) {
     header.onclick = () => {
       wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
     };
+
+    const showTargetFC = fc === SELLER_FC;
 
     const table = document.createElement('table');
     table.innerHTML = `
@@ -36,7 +40,7 @@ export function renderTable(data) {
           <th>Decision</th>
           <th>Send Qty</th>
           <th>Recall Qty</th>
-          <th>Target FC</th>
+          ${showTargetFC ? '<th>Seller (Suggested FC)</th>' : ''}
           <th>Remarks</th>
         </tr>
       </thead>
@@ -50,11 +54,11 @@ export function renderTable(data) {
             <td>${r.sellerSKU}</td>
             <td>${r.currentFCStock}</td>
             <td>${r.gross30DSale}</td>
-            <td>${r.stockCover ?? '-'}</td>
+            <td>${r.stockCover}</td>
             <td>${r.decision}</td>
             <td>${r.sendQty}</td>
             <td>${r.recallQty}</td>
-            <td>${r.targetFC || '-'}</td>
+            ${showTargetFC ? `<td>${r.targetFC}</td>` : ''}
             <td>${r.remarks}</td>
           </tr>
         `).join('')}
