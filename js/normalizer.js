@@ -19,95 +19,125 @@ function getValue(row, keywords) {
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* ---------- UNIWARE STATUS MAP ---------- */
-  const skuStatus = {};
-  fixedData.statusMap.split('\n').slice(1).forEach(r => {
-    const [sellerSKU, status] = r.split(',');
-    if (sellerSKU && status) {
-      skuStatus[sellerSKU.trim()] = status.trim();
+  /* ===============================
+     1. SELLER → UNIWARE SKU MAP
+     =============================== */
+  const sellerToUniware = {};
+  fixedData.skuMap.split('\n').slice(1).forEach(r => {
+    const [sellerSKU, uniwareSKU] = r.split(',');
+    if (sellerSKU && uniwareSKU) {
+      sellerToUniware[sellerSKU.trim()] = uniwareSKU.trim();
     }
   });
 
-  /* ---------- SELLER STOCK (SUM Available ATP) ---------- */
-  const sellerStockMap = {};
-  sellerStock.forEach(r => {
-    const sku = getValue(r, ['sku']);
-    const stock = Number(getValue(r, ['available', 'qty', 'stock'])) || 0;
-
-    if (!sku) return;
-
-    sellerStockMap[sku] = (sellerStockMap[sku] || 0) + stock;
+  /* ===============================
+     2. UNIWARE STATUS MAP
+     =============================== */
+  const uniwareStatusMap = {};
+  fixedData.statusMap.split('\n').slice(1).forEach(r => {
+    const [uniwareSKU, status] = r.split(',');
+    if (uniwareSKU && status) {
+      uniwareStatusMap[uniwareSKU.trim()] = status.trim();
+    }
   });
 
-  /* ---------- FBF STOCK (SUM Live on Website) ---------- */
+  /* ===============================
+     3. UNIWARE STOCK (SUM ATP)
+     =============================== */
+  const uniwareStockMap = {};
+  sellerStock.forEach(r => {
+    const uniwareSKU = getValue(r, ['sku code']);
+    const stock = Number(getValue(r, ['available', 'atp'])) || 0;
+
+    if (!uniwareSKU) return;
+
+    uniwareStockMap[uniwareSKU] =
+      (uniwareStockMap[uniwareSKU] || 0) + stock;
+  });
+
+  /* ===============================
+     4. FBF STOCK (SUM LIVE)
+     =============================== */
   const fbfStockMap = {};
   fbfStock.forEach(r => {
-    const sku = getValue(r, ['sku']);
-    const fc = getValue(r, ['warehouse', 'location']);
+    const sellerSKU = getValue(r, ['sku']);
+    const fc = getValue(r, ['warehouse']);
     const stock = Number(getValue(r, ['live'])) || 0;
 
-    if (!sku || !fc) return;
+    if (!sellerSKU || !fc) return;
 
-    const key = `${sku}||${fc}`;
+    const key = `${sellerSKU}||${fc}`;
     fbfStockMap[key] = (fbfStockMap[key] || 0) + stock;
   });
 
-  /* ---------- SALES (SUM Gross Units) ---------- */
+  /* ===============================
+     5. SALES (SUM GROSS UNITS)
+     =============================== */
   const salesMap = {};
   sales.forEach(r => {
-    const sku = getValue(r, ['sku id', 'sku']);
-    const fc = getValue(r, ['location', 'warehouse']);
+    const sellerSKU = getValue(r, ['sku id']);
+    const fc = getValue(r, ['location']);
     const gross = Number(getValue(r, ['gross units'])) || 0;
     const ret = Number(getValue(r, ['return units'])) || 0;
 
-    if (!sku || !fc) return;
+    if (!sellerSKU || !fc) return;
 
-    const key = `${sku}||${fc}`;
+    const key = `${sellerSKU}||${fc}`;
     if (!salesMap[key]) {
       salesMap[key] = { gross: 0, returns: 0 };
     }
-
     salesMap[key].gross += gross;
     salesMap[key].returns += ret;
   });
 
-  /* ---------- BUILD FINAL UNIQUE DATASET ---------- */
+  /* ===============================
+     6. BUILD FINAL WORKING DATA
+     =============================== */
   const working = [];
 
   Object.keys(salesMap).forEach(key => {
-    const [sku, fc] = key.split('||');
+    const [sellerSKU, fc] = key.split('||');
+
+    const uniwareSKU = sellerToUniware[sellerSKU] || '';
+    const uniwareStock = uniwareStockMap[uniwareSKU] || 0;
+    const uniwareStatus = uniwareStatusMap[uniwareSKU] || 'OPEN';
 
     working.push({
       fc,
-      sellerSKU: sku,
+      sellerSKU,
+      uniwareSKU,
 
       gross30DSale: salesMap[key].gross,
       return30D: salesMap[key].returns,
 
       currentFCStock: fbfStockMap[key] || 0,
-      sellerStock: sellerStockMap[sku] || 0,
+      sellerStock: uniwareStock,
 
-      uniwareStatus: skuStatus[sku] || 'OPEN'
+      uniwareStatus
     });
   });
 
-  /* ---------- INCLUDE FBF STOCK WITH NO SALES ---------- */
+  /* ===============================
+     7. INCLUDE FBF STOCK WITH NO SALES
+     =============================== */
   Object.keys(fbfStockMap).forEach(key => {
     if (salesMap[key]) return;
 
-    const [sku, fc] = key.split('||');
+    const [sellerSKU, fc] = key.split('||');
+    const uniwareSKU = sellerToUniware[sellerSKU] || '';
 
     working.push({
       fc,
-      sellerSKU: sku,
+      sellerSKU,
+      uniwareSKU,
 
       gross30DSale: 0,
       return30D: 0,
 
       currentFCStock: fbfStockMap[key],
-      sellerStock: sellerStockMap[sku] || 0,
+      sellerStock: uniwareStockMap[uniwareSKU] || 0,
 
-      uniwareStatus: skuStatus[sku] || 'OPEN'
+      uniwareStatus: uniwareStatusMap[uniwareSKU] || 'OPEN'
     });
   });
 
