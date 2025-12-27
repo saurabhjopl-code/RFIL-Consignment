@@ -1,12 +1,10 @@
-export function parseFile(rawData, fileName) {
+export function parseFile(rawData) {
   const workbook = XLSX.read(rawData, { type: 'binary' });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
   if (!json.length) {
-    throw new Error(`File ${fileName} is empty`);
+    throw new Error('Uploaded file is empty');
   }
 
   return json;
