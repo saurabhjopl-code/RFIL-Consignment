@@ -1,7 +1,8 @@
 export function calculateQuantities(row, decision) {
 
-  // 🔴 HARD OVERRIDE: CLOSED SKU → FULL RECALL
-  if (row.uniwareRemark && row.uniwareRemark.toLowerCase().includes('closed')) {
+  // 🔴 CLOSED SKU → FULL RECALL
+  if (row.uniwareRemark &&
+      row.uniwareRemark.toLowerCase().includes('closed')) {
     return {
       ...row,
       sendQty: 0,
