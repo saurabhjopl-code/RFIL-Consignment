@@ -6,6 +6,7 @@ import {
   validateFBFStock,
   validateSellerStock
 } from './validator.js';
+import { normalizeData } from './normalizer.js';
 
 const salesInput = document.getElementById('salesFile');
 const fbfInput = document.getElementById('fbfStockFile');
@@ -15,6 +16,7 @@ const statusDiv = document.getElementById('status');
 
 let fixedData = {};
 let parsedData = {};
+let workingData = [];
 
 async function init() {
   statusDiv.innerText = 'Loading fixed reference files...';
@@ -29,28 +31,23 @@ generateBtn.addEventListener('click', async () => {
       return;
     }
 
-    statusDiv.innerText = 'Reading files...';
+    statusDiv.innerText = 'Reading & parsing files...';
 
-    const salesRaw = await loadFile(salesInput.files[0]);
-    const fbfRaw = await loadFile(fbfInput.files[0]);
-    const sellerRaw = await loadFile(sellerInput.files[0]);
-
-    statusDiv.innerText = 'Parsing files...';
-
-    parsedData.sales = parseFile(salesRaw);
-    parsedData.fbfStock = parseFile(fbfRaw);
-    parsedData.sellerStock = parseFile(sellerRaw);
-
-    statusDiv.innerText = 'Validating columns...';
+    parsedData.sales = parseFile(await loadFile(salesInput.files[0]));
+    parsedData.fbfStock = parseFile(await loadFile(fbfInput.files[0]));
+    parsedData.sellerStock = parseFile(await loadFile(sellerInput.files[0]));
 
     validateSales(parsedData.sales);
     validateFBFStock(parsedData.fbfStock);
     validateSellerStock(parsedData.sellerStock);
 
-    console.log('PARSED & VALIDATED DATA:', parsedData);
-    console.log('FIXED CSV DATA:', fixedData);
+    statusDiv.innerText = 'Normalizing & joining data...';
 
-    statusDiv.innerText = 'Phase 2 completed successfully.';
+    workingData = normalizeData(parsedData, fixedData);
+
+    console.log('FINAL WORKING DATA (Phase 3):', workingData);
+
+    statusDiv.innerText = `Phase 3 complete. ${workingData.length} rows created.`;
 
   } catch (err) {
     console.error(err);
