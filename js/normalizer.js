@@ -1,7 +1,7 @@
 const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
 
 /* ===============================
-   SKU NORMALIZATION
+   SKU NORMALIZATION (LOCKED)
    =============================== */
 function normalizeSKU(val) {
   if (!val) return '';
@@ -9,8 +9,8 @@ function normalizeSKU(val) {
     .toString()
     .trim()
     .toUpperCase()
-    .replace(/[\u2010-\u2015\u2212]/g, '-')
-    .replace(/\u00A0/g, '')
+    .replace(/[\u2010-\u2015\u2212]/g, '-') // normalize hyphens
+    .replace(/\u00A0/g, '')               // remove NBSP
     .replace(/\s+/g, '');
 }
 
@@ -22,6 +22,9 @@ function normalizeKey(key) {
     .replace(/[()]/g, '');
 }
 
+/* ===============================
+   Column finder
+   =============================== */
 function findColumn(row, mustContainAll) {
   for (const k of Object.keys(row)) {
     const nk = normalizeKey(k);
@@ -35,7 +38,7 @@ function findColumn(row, mustContainAll) {
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
   /* ===============================
-     Seller → Uniware SKU mapping
+     1. Seller → Uniware SKU mapping
      =============================== */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
@@ -45,7 +48,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Uniware Remarks (Closed etc.)
+     2. Uniware Remark (Closed etc.)
      =============================== */
   const remarkMap = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
@@ -55,31 +58,27 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     ✅ CORRECT UNIWARE STOCK
+     3. ✅ FINAL FIX: Uniware Stock
      =============================== */
   const uniwareStock = {};
 
   sellerStock.forEach(r => {
     const skuCol = findColumn(r, ['skucode']);
-    if (!skuCol) return;
+    const stockCol = findColumn(r, ['total', 'inventory']); // 🔒 ONLY THIS
+
+    if (!skuCol || !stockCol) return;
 
     const uniwareSKU = normalizeSKU(r[skuCol]);
+    const qty = Number(r[stockCol]) || 0;
+
     if (!uniwareSKU) return;
-
-    // Priority-based stock column detection
-    const totalStockCol =
-      findColumn(r, ['total', 'stock']) ||
-      findColumn(r, ['total', 'inventory']) ||
-      findColumn(r, ['available', 'atp']);
-
-    const qty = Number(r[totalStockCol]) || 0;
 
     uniwareStock[uniwareSKU] =
       (uniwareStock[uniwareSKU] || 0) + qty;
   });
 
   /* ===============================
-     FBF Stock (unchanged)
+     4. FBF Stock (UNCHANGED)
      =============================== */
   const fbfMap = {};
   fbfStock.forEach(r => {
@@ -99,7 +98,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Sales (unchanged)
+     5. Sales (UNCHANGED)
      =============================== */
   const salesMap = {};
   sales.forEach(r => {
@@ -124,7 +123,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Build Working Dataset
+     6. Build Working Dataset
      =============================== */
   const working = [];
   const keys = new Set([
