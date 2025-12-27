@@ -1,115 +1,111 @@
-function normalizeKey(key) {
-  return key
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[\(\)\-]/g, '');
+function clean(val) {
+  return (val || '').toString().trim();
 }
 
-function getValue(row, keywords) {
+function key(val) {
+  return clean(val).toUpperCase();
+}
+
+function getVal(row, keywords) {
   for (const k of Object.keys(row)) {
-    const nk = normalizeKey(k);
-    if (keywords.some(w => nk.includes(w))) {
-      return row[k];
-    }
+    const nk = k.toLowerCase();
+    if (keywords.some(w => nk.includes(w))) return row[k];
   }
   return '';
 }
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* ---------- UNIWARE STATUS MAP ---------- */
-  const skuStatus = {};
+  /* ======================================================
+     1) SELLER → UNIWARE SKU MAP  (THE BRIDGE)
+     ====================================================== */
+  const sellerToUniware = {};
+  fixedData.skuMap.split('\n').slice(1).forEach(r => {
+    const [sellerSKU, uniwareSKU] = r.split(',');
+    if (!sellerSKU || !uniwareSKU) return;
+    sellerToUniware[key(sellerSKU)] = key(uniwareSKU);
+  });
+
+  /* ======================================================
+     2) UNIWARE STATUS (BY UNIWARE SKU)
+     ====================================================== */
+  const uniwareStatus = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
-    const [uniwareSKU, status] = r.split(',');
-    if (uniwareSKU && status) {
-      skuStatus[uniwareSKU.trim()] = status.trim();
-    }
+    const [uSku, remark] = r.split(',');
+    if (!uSku) return;
+    uniwareStatus[key(uSku)] = clean(remark || '');
   });
 
-  /* ---------- UNIWARE STOCK (USE TOTAL INVENTORY ONLY) ---------- */
-  const sellerStockMap = {};
+  /* ======================================================
+     3) UNIWARE STOCK (BY UNIWARE SKU)
+        SOURCE = Total Inventory (LOCKED)
+     ====================================================== */
+  const uniwareStock = {};
   sellerStock.forEach(r => {
-    const sku = getValue(r, ['sku code', 'sku']);
-    const stock = Number(getValue(r, ['total inventory'])) || 0;
-
-    if (!sku) return;
-
-    sellerStockMap[sku] = (sellerStockMap[sku] || 0) + stock;
+    const uSku = key(getVal(r, ['sku code', 'sku']));
+    const qty = Number(getVal(r, ['total inventory'])) || 0;
+    if (!uSku) return;
+    uniwareStock[uSku] = (uniwareStock[uSku] || 0) + qty;
   });
 
-  /* ---------- FBF STOCK (SUM Live on Website) ---------- */
-  const fbfStockMap = {};
+  /* ======================================================
+     4) FBF STOCK (BY SELLER SKU + FC)
+     ====================================================== */
+  const fbfMap = {};
   fbfStock.forEach(r => {
-    const sku = getValue(r, ['sku']);
-    const fc = getValue(r, ['warehouse', 'location']);
-    const stock = Number(getValue(r, ['live'])) || 0;
-
-    if (!sku || !fc) return;
-
-    const key = `${sku}||${fc}`;
-    fbfStockMap[key] = (fbfStockMap[key] || 0) + stock;
+    const sSku = key(getVal(r, ['sku']));
+    const fc = clean(getVal(r, ['warehouse', 'location']));
+    const qty = Number(getVal(r, ['live'])) || 0;
+    if (!sSku || !fc) return;
+    const k = `${sSku}||${fc}`;
+    fbfMap[k] = (fbfMap[k] || 0) + qty;
   });
 
-  /* ---------- SALES (SUM Gross Units) ---------- */
+  /* ======================================================
+     5) SALES (BY SELLER SKU + FC)
+     ====================================================== */
   const salesMap = {};
   sales.forEach(r => {
-    const sku = getValue(r, ['sku id', 'sku']);
-    const fc = getValue(r, ['location', 'warehouse']);
-    const gross = Number(getValue(r, ['gross units'])) || 0;
-    const ret = Number(getValue(r, ['return units'])) || 0;
-
-    if (!sku || !fc) return;
-
-    const key = `${sku}||${fc}`;
-    if (!salesMap[key]) {
-      salesMap[key] = { gross: 0, returns: 0 };
-    }
-
-    salesMap[key].gross += gross;
-    salesMap[key].returns += ret;
+    const sSku = key(getVal(r, ['sku id', 'sku']));
+    const fc = clean(getVal(r, ['location', 'warehouse']));
+    const gross = Number(getVal(r, ['gross units'])) || 0;
+    const ret = Number(getVal(r, ['return units'])) || 0;
+    if (!sSku || !fc) return;
+    const k = `${sSku}||${fc}`;
+    if (!salesMap[k]) salesMap[k] = { gross: 0, ret: 0 };
+    salesMap[k].gross += gross;
+    salesMap[k].ret += ret;
   });
 
-  /* ---------- BUILD FINAL UNIQUE DATASET ---------- */
-  const working = [];
+  /* ======================================================
+     6) BUILD FINAL DATASET (CORRECT JOIN ORDER)
+     ====================================================== */
+  const out = [];
+  const keys = new Set([
+    ...Object.keys(fbfMap),
+    ...Object.keys(salesMap)
+  ]);
 
-  Object.keys(salesMap).forEach(key => {
-    const [sku, fc] = key.split('||');
+  keys.forEach(k => {
+    const [sellerSKU, fc] = k.split('||');
 
-    working.push({
+    // 🔑 CRITICAL STEP: MAP FIRST
+    const uniwareSKU = sellerToUniware[sellerSKU] || '';
+
+    out.push({
       fc,
-      sellerSKU: sku,
+      sellerSKU,
+      uniwareSKU,
 
-      gross30DSale: salesMap[key].gross,
-      return30D: salesMap[key].returns,
+      gross30DSale: salesMap[k]?.gross || 0,
+      return30D: salesMap[k]?.ret || 0,
 
-      currentFCStock: fbfStockMap[key] || 0,
-      sellerStock: sellerStockMap[sku] || 0,
+      currentFCStock: fbfMap[k] || 0,
+      uniwareStock: uniwareStock[uniwareSKU] || 0,
 
-      uniwareStatus: skuStatus[sku] || 'OPEN'
+      uniwareStatus: uniwareStatus[uniwareSKU] || 'OPEN'
     });
   });
 
-  /* ---------- INCLUDE FBF STOCK WITH NO SALES ---------- */
-  Object.keys(fbfStockMap).forEach(key => {
-    if (salesMap[key]) return;
-
-    const [sku, fc] = key.split('||');
-
-    working.push({
-      fc,
-      sellerSKU: sku,
-
-      gross30DSale: 0,
-      return30D: 0,
-
-      currentFCStock: fbfStockMap[key],
-      sellerStock: sellerStockMap[sku] || 0,
-
-      uniwareStatus: skuStatus[sku] || 'OPEN'
-    });
-  });
-
-  return working;
+  return out;
 }
