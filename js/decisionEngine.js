@@ -1,9 +1,11 @@
 export function decide(row) {
-  // Hard blocks
-  if (row.uniwareStatus === 'CLOSE') {
+
+  // 🔴 HARD OVERRIDE: CLOSED SKU
+  if (row.uniwareRemark && row.uniwareRemark.toLowerCase().includes('closed')) {
     return 'DO NOT SEND';
   }
 
+  // Seller stock below minimum
   if (row.sellerStock < 10) {
     return 'DO NOT SEND';
   }
@@ -13,7 +15,7 @@ export function decide(row) {
     return 'DISCUSS';
   }
 
-  // Non-moving
+  // Non-moving SKU
   if (row.gsv === 0) {
     return 'RECALL';
   }
