@@ -18,7 +18,7 @@ function getVal(row, keywords) {
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* ---------- Seller → Uniware SKU map ---------- */
+  /* ---------- Seller → Uniware SKU ---------- */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
     const [s, u] = r.split(',');
@@ -34,7 +34,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     uniwareStatus[key(u)] = clean(status || '');
   });
 
-  /* ---------- Uniware Stock (Total Inventory) ---------- */
+  /* ---------- Uniware Stock ---------- */
   const uniwareStockMap = {};
   sellerStock.forEach(r => {
     const uSku = key(getVal(r, ['sku']));
@@ -68,12 +68,9 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     salesMap[k].ret += ret;
   });
 
-  /* ---------- Build Final Dataset ---------- */
+  /* ---------- Build Dataset ---------- */
   const out = [];
-  const keys = new Set([
-    ...Object.keys(fbfMap),
-    ...Object.keys(salesMap)
-  ]);
+  const keys = new Set([...Object.keys(fbfMap), ...Object.keys(salesMap)]);
 
   keys.forEach(k => {
     const [sellerSKU, fc] = k.split('||');
@@ -81,10 +78,14 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     const uniStock = uniwareStockMap[uniwareSKU] || 0;
 
     let currentFCStock = fbfMap[k] || 0;
+    let stockCover = null;
+    let decision = '';
 
-    // 🔴 STEP-1 LOGIC: Uniware-only FC
+    // 🔴 SELLER / UNIWARE FC OVERRIDE
     if (fc === UNIWARE_ONLY_FC) {
       currentFCStock = uniStock;
+      stockCover = null;
+      decision = 'HOLD';
     }
 
     out.push({
@@ -97,6 +98,9 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
       currentFCStock,
       sellerStock: uniStock,
+
+      stockCover,
+      decision,
 
       uniwareStatus: uniwareStatus[uniwareSKU] || 'OPEN'
     });
