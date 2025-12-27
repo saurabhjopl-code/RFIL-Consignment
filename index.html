@@ -14,25 +14,19 @@
 
     <label>
       30 Days Sales File (Flipkart)
-      <span class="hint">
-        Required columns: SKU ID, Location Id, Gross Units, Return Units
-      </span>
+      <span class="hint">SKU ID, Location Id, Gross Units, Return Units</span>
     </label>
     <input type="file" id="salesFile" accept=".csv,.xlsx" />
 
     <label>
       FBF Stock File
-      <span class="hint">
-        Required columns: Warehouse Id, SKU, Live on Website (FBF Stock)
-      </span>
+      <span class="hint">Warehouse Id, SKU, Live on Website (FBF Stock)</span>
     </label>
     <input type="file" id="fbfStockFile" accept=".csv,.xlsx" />
 
     <label>
       Seller (Uniware) Stock File
-      <span class="hint">
-        Required columns: Seller SKU, Available Stock
-      </span>
+      <span class="hint">Seller SKU, Available Stock</span>
     </label>
     <input type="file" id="sellerStockFile" accept=".csv,.xlsx" />
 
@@ -41,6 +35,7 @@
 
   <div id="status"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
