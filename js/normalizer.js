@@ -1,5 +1,21 @@
 const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
 
+/* ===============================
+   HARD SKU NORMALIZATION
+   =============================== */
+function normalizeSKU(val) {
+  if (!val) return '';
+  return val
+    .toString()
+    .trim()
+    .toUpperCase()
+    // replace all unicode hyphens with normal hyphen
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    // remove hidden non-breaking spaces
+    .replace(/\u00A0/g, '')
+    .replace(/\s+/g, '');
+}
+
 function normalizeKey(key) {
   return key
     .toString()
@@ -24,46 +40,40 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
     const [seller, uniware] = r.split(',');
-    if (seller && uniware) {
-      sellerToUniware[seller.trim()] = uniware.trim();
-    }
+    if (!seller || !uniware) return;
+    sellerToUniware[normalizeSKU(seller)] = normalizeSKU(uniware);
   });
 
   /* ===============================
-     2. Uniware Remark (Closed etc.)
+     2. Uniware Remark
      =============================== */
   const remarkMap = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
     const [sku, remark] = r.split(',');
-    if (sku && remark) {
-      remarkMap[sku.trim()] = remark.trim();
-    }
+    if (!sku || !remark) return;
+    remarkMap[normalizeSKU(sku)] = remark.trim();
   });
 
   /* ===============================
-     3. ✅ FIXED: Uniware Stock
+     3. ✅ Uniware Stock (FIXED)
      =============================== */
   const uniwareStock = {};
-
   sellerStock.forEach(r => {
-    const uniwareSKU = getLoose(r, ['skucode']);
-    if (!uniwareSKU) return;
+    const rawSKU = getLoose(r, ['skucode']);
+    const sku = normalizeSKU(rawSKU);
+    if (!sku) return;
 
-    // 🔴 Robust detection of Available (ATP)
-    const atp = Number(
-      getLoose(r, ['available', 'atp'])
-    ) || 0;
+    const atp = Number(getLoose(r, ['available', 'atp'])) || 0;
 
-    uniwareStock[uniwareSKU] =
-      (uniwareStock[uniwareSKU] || 0) + atp;
+    uniwareStock[sku] = (uniwareStock[sku] || 0) + atp;
   });
 
   /* ===============================
-     4. FBF Stock (unchanged)
+     4. FBF Stock
      =============================== */
   const fbfMap = {};
   fbfStock.forEach(r => {
-    const sellerSKU = getLoose(r, ['sku']);
+    const sellerSKU = normalizeSKU(getLoose(r, ['sku']));
     const fc = getLoose(r, ['warehouse']);
     const qty = Number(getLoose(r, ['live'])) || 0;
     if (!sellerSKU || !fc) return;
@@ -72,11 +82,11 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     5. Sales (unchanged)
+     5. Sales
      =============================== */
   const salesMap = {};
   sales.forEach(r => {
-    const sellerSKU = getLoose(r, ['skuid']);
+    const sellerSKU = normalizeSKU(getLoose(r, ['skuid']));
     const fc = getLoose(r, ['location']);
     const qty = Number(getLoose(r, ['grossunits'])) || 0;
     const ret = Number(getLoose(r, ['returnunits'])) || 0;
@@ -103,7 +113,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
     let currentFCStock = fbfMap[key] || 0;
 
-    // 🔴 Uniware-only FC logic
+    // Uniware-only FC
     if (fc === UNIWARE_ONLY_FC) {
       currentFCStock = uniStock;
     }
