@@ -1,3 +1,5 @@
+const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
+
 function clean(val) {
   return (val || '').toString().trim();
 }
@@ -16,41 +18,32 @@ function getVal(row, keywords) {
 
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
-  /* ======================================================
-     1) SELLER → UNIWARE SKU MAP
-     ====================================================== */
+  /* ---------- Seller → Uniware SKU map ---------- */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
-    const [sellerSKU, uniwareSKU] = r.split(',');
-    if (!sellerSKU || !uniwareSKU) return;
-    sellerToUniware[key(sellerSKU)] = key(uniwareSKU);
+    const [s, u] = r.split(',');
+    if (!s || !u) return;
+    sellerToUniware[key(s)] = key(u);
   });
 
-  /* ======================================================
-     2) UNIWARE STATUS (BY UNIWARE SKU)
-     ====================================================== */
+  /* ---------- Uniware Status ---------- */
   const uniwareStatus = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
-    const [uSku, remark] = r.split(',');
-    if (!uSku) return;
-    uniwareStatus[key(uSku)] = clean(remark || '');
+    const [u, status] = r.split(',');
+    if (!u) return;
+    uniwareStatus[key(u)] = clean(status || '');
   });
 
-  /* ======================================================
-     3) UNIWARE STOCK (BY UNIWARE SKU)
-        SOURCE = Total Inventory
-     ====================================================== */
+  /* ---------- Uniware Stock (Total Inventory) ---------- */
   const uniwareStockMap = {};
   sellerStock.forEach(r => {
-    const uSku = key(getVal(r, ['sku code', 'sku']));
+    const uSku = key(getVal(r, ['sku']));
     const qty = Number(getVal(r, ['total inventory'])) || 0;
     if (!uSku) return;
     uniwareStockMap[uSku] = (uniwareStockMap[uSku] || 0) + qty;
   });
 
-  /* ======================================================
-     4) FBF STOCK (BY SELLER SKU + FC)
-     ====================================================== */
+  /* ---------- FBF Stock ---------- */
   const fbfMap = {};
   fbfStock.forEach(r => {
     const sSku = key(getVal(r, ['sku']));
@@ -61,13 +54,11 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     fbfMap[k] = (fbfMap[k] || 0) + qty;
   });
 
-  /* ======================================================
-     5) SALES (BY SELLER SKU + FC)
-     ====================================================== */
+  /* ---------- Sales ---------- */
   const salesMap = {};
   sales.forEach(r => {
-    const sSku = key(getVal(r, ['sku id', 'sku']));
-    const fc = clean(getVal(r, ['location', 'warehouse']));
+    const sSku = key(getVal(r, ['sku']));
+    const fc = clean(getVal(r, ['location']));
     const gross = Number(getVal(r, ['gross units'])) || 0;
     const ret = Number(getVal(r, ['return units'])) || 0;
     if (!sSku || !fc) return;
@@ -77,9 +68,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
     salesMap[k].ret += ret;
   });
 
-  /* ======================================================
-     6) BUILD FINAL DATASET (KEY FIX HERE)
-     ====================================================== */
+  /* ---------- Build Final Dataset ---------- */
   const out = [];
   const keys = new Set([
     ...Object.keys(fbfMap),
@@ -89,6 +78,14 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   keys.forEach(k => {
     const [sellerSKU, fc] = k.split('||');
     const uniwareSKU = sellerToUniware[sellerSKU] || '';
+    const uniStock = uniwareStockMap[uniwareSKU] || 0;
+
+    let currentFCStock = fbfMap[k] || 0;
+
+    // 🔴 STEP-1 LOGIC: Uniware-only FC
+    if (fc === UNIWARE_ONLY_FC) {
+      currentFCStock = uniStock;
+    }
 
     out.push({
       fc,
@@ -98,10 +95,8 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
       gross30DSale: salesMap[k]?.gross || 0,
       return30D: salesMap[k]?.ret || 0,
 
-      currentFCStock: fbfMap[k] || 0,
-
-      // 🔴 CRITICAL: keep legacy property name
-      sellerStock: uniwareStockMap[uniwareSKU] || 0,
+      currentFCStock,
+      sellerStock: uniStock,
 
       uniwareStatus: uniwareStatus[uniwareSKU] || 'OPEN'
     });
