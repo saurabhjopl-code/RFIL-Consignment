@@ -1,44 +1,51 @@
 body {
   font-family: Arial, sans-serif;
   padding: 20px;
-  background: #f5f5f5;
+  background: #f7f7f7;
 }
 
-.upload-section, .actions {
-  background: #fff;
-  padding: 15px;
+h1 {
+  margin-bottom: 20px;
+}
+
+.upload-section {
+  background: #ffffff;
+  padding: 20px;
   border-radius: 6px;
-  margin-bottom: 15px;
+  width: 450px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-label {
+.upload-section h2 {
+  margin-top: 0;
+}
+
+.upload-section label {
   display: block;
-  margin-top: 10px;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.upload-section input {
+  margin-top: 5px;
 }
 
 button {
-  margin-top: 10px;
-  padding: 8px 16px;
+  margin-top: 20px;
+  padding: 10px 18px;
+  font-size: 14px;
   cursor: pointer;
 }
 
 #status {
-  margin: 15px 0;
+  margin-top: 25px;
   font-weight: bold;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-}
-
-th, td {
-  border: 1px solid #ccc;
-  padding: 6px;
-  font-size: 13px;
-}
-
-th {
-  background: #eee;
+.hint {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  font-weight: normal;
+  margin-top: 3px;
 }
