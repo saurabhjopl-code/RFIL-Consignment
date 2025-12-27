@@ -1,24 +1,45 @@
-function hasColumns(row, cols) {
-  return cols.every(col => Object.prototype.hasOwnProperty.call(row, col));
+function normalizeKey(key) {
+  return key
+    .toString()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function hasColumns(row, requiredCols) {
+  const normalizedRowKeys = Object.keys(row).map(normalizeKey);
+  const normalizedRequired = requiredCols.map(normalizeKey);
+
+  return normalizedRequired.every(req =>
+    normalizedRowKeys.includes(req)
+  );
 }
 
 export function validateSales(data) {
-  const cols = ['SKU ID', 'Location Id', 'Gross Units', 'Return Units'];
-  if (!hasColumns(data[0], cols)) {
-    throw new Error('Sales file columns mismatch');
+  const required = ['SKU ID', 'Location Id', 'Gross Units', 'Return Units'];
+  if (!hasColumns(data[0], required)) {
+    console.error('Sales headers found:', Object.keys(data[0]));
+    throw new Error(
+      'Sales file columns mismatch. Required: ' + required.join(', ')
+    );
   }
 }
 
 export function validateFBFStock(data) {
-  const cols = ['Warehouse Id', 'SKU', 'Live on Website (FBF Stock)'];
-  if (!hasColumns(data[0], cols)) {
-    throw new Error('FBF Stock file columns mismatch');
+  const required = ['Warehouse Id', 'SKU', 'Live on Website (FBF Stock)'];
+  if (!hasColumns(data[0], required)) {
+    console.error('FBF headers found:', Object.keys(data[0]));
+    throw new Error(
+      'FBF Stock file columns mismatch. Required: ' + required.join(', ')
+    );
   }
 }
 
 export function validateSellerStock(data) {
-  const cols = ['Seller SKU', 'Available Stock'];
-  if (!hasColumns(data[0], cols)) {
-    throw new Error('Seller Stock file columns mismatch');
+  const required = ['Seller SKU', 'Available Stock'];
+  if (!hasColumns(data[0], required)) {
+    console.error('Seller headers found:', Object.keys(data[0]));
+    throw new Error(
+      'Seller Stock file columns mismatch. Required: ' + required.join(', ')
+    );
   }
 }
