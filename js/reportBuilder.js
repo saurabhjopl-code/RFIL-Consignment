@@ -2,6 +2,9 @@ export function renderTable(data) {
   const container = document.getElementById('tableContainer');
   container.innerHTML = '';
 
+  // 🔁 Sort ALL data by 30D Sale (DESC)
+  data.sort((a, b) => b.gross30DSale - a.gross30DSale);
+
   // Group by FC
   const fcGroups = {};
   data.forEach(r => {
@@ -11,12 +14,12 @@ export function renderTable(data) {
 
   Object.keys(fcGroups).forEach(fc => {
     const section = document.createElement('div');
-    section.style.marginBottom = '15px';
+    section.style.marginBottom = '16px';
 
     const header = document.createElement('div');
     header.style.cursor = 'pointer';
     header.style.fontWeight = 'bold';
-    header.style.background = '#eaeaea';
+    header.style.background = '#f0f0f0';
     header.style.padding = '8px';
     header.innerText = `FC: ${fc} (Rows: ${fcGroups[fc].length})`;
 
@@ -31,8 +34,14 @@ export function renderTable(data) {
     const table = document.createElement('table');
 
     const headers = [
-      'SKU','Current Stock','30D Sale',
-      'Stock Cover','Decision','Send Qty','Recall Qty','Remarks'
+      'SKU',
+      'Current Stock',
+      '30D Sale',
+      'Stock Cover',
+      'Decision',
+      'Send Qty',
+      'Recall Qty',
+      'Remarks'
     ];
 
     const thead = document.createElement('thead');
@@ -49,6 +58,16 @@ export function renderTable(data) {
 
     fcGroups[fc].forEach(r => {
       const tr = document.createElement('tr');
+
+      // 🎨 COLOR CODING
+      if (r.decision === 'RECALL') {
+        tr.style.background = '#f8d7da'; // red
+      } else if (r.decision === 'DISCUSS') {
+        tr.style.background = '#fff3cd'; // amber
+      } else if (r.decision === 'SEND') {
+        tr.style.background = '#d4edda'; // green
+      }
+
       [
         r.sellerSKU,
         r.currentFCStock,
@@ -63,6 +82,7 @@ export function renderTable(data) {
         td.innerText = v;
         tr.appendChild(td);
       });
+
       tbody.appendChild(tr);
     });
 
