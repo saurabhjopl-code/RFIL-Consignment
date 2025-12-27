@@ -7,35 +7,34 @@
 </head>
 <body>
 
-  <h1>Flipkart FBF Stock Cover Dashboard</h1>
+<h1>Flipkart FBF Stock Cover Dashboard</h1>
 
-  <div class="upload-section">
-    <h2>Required File Uploads</h2>
+<div class="upload-section">
+  <h2>Required File Uploads</h2>
 
-    <label>
-      30 Days Sales File (Flipkart)
-      <span class="hint">SKU ID, Location Id, Gross Units, Return Units</span>
-    </label>
-    <input type="file" id="salesFile" accept=".csv,.xlsx" />
+  <label>30 Days Sales File</label>
+  <input type="file" id="salesFile" accept=".csv,.xlsx">
 
-    <label>
-      FBF Stock File
-      <span class="hint">Warehouse Id, SKU, Live on Website (FBF Stock)</span>
-    </label>
-    <input type="file" id="fbfStockFile" accept=".csv,.xlsx" />
+  <label>FBF Stock File</label>
+  <input type="file" id="fbfStockFile" accept=".csv,.xlsx">
 
-    <label>
-      Seller (Uniware) Stock File
-      <span class="hint">Seller SKU, Available Stock</span>
-    </label>
-    <input type="file" id="sellerStockFile" accept=".csv,.xlsx" />
+  <label>Seller (Uniware) Stock File</label>
+  <input type="file" id="sellerStockFile" accept=".csv,.xlsx">
 
-    <button id="generateBtn">Generate Report</button>
-  </div>
+  <button id="generateBtn">Generate Report</button>
+</div>
 
-  <div id="status"></div>
+<div class="actions">
+  <button id="exportShipment">Export Shipment</button>
+  <button id="exportRecall">Export Recall</button>
+  <button id="exportWorking">Export Whole Working</button>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="js/main.js"></script>
+<div id="status"></div>
+
+<div id="tableContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
