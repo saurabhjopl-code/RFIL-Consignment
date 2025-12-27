@@ -1,73 +1,56 @@
 import { loadFixedCSVs } from './mappingLogic.js';
 import { loadFile } from './fileLoader.js';
 import { parseFile } from './parser.js';
-import {
-  validateSales,
-  validateFBFStock,
-  validateSellerStock
-} from './validator.js';
+import { validateSales, validateFBFStock, validateSellerStock } from './validator.js';
 import { normalizeData } from './normalizer.js';
 import { applyStockCover } from './stockCoverLogic.js';
 import { decide } from './decisionEngine.js';
 import { calculateQuantities } from './quantityLogic.js';
 import { getRemarks } from './remarksLogic.js';
+import { renderTable } from './reportBuilder.js';
+import { exportShipment, exportRecall, exportWholeWorking } from './exportLogic.js';
 
-const salesInput = document.getElementById('salesFile');
-const fbfInput = document.getElementById('fbfStockFile');
-const sellerInput = document.getElementById('sellerStockFile');
+const salesFile = document.getElementById('salesFile');
+const fbfFile = document.getElementById('fbfStockFile');
+const sellerFile = document.getElementById('sellerStockFile');
 const generateBtn = document.getElementById('generateBtn');
 const statusDiv = document.getElementById('status');
 
 let fixedData = {};
-let workingData = [];
 let finalData = [];
 
 async function init() {
-  statusDiv.innerText = 'Loading fixed reference files...';
   fixedData = await loadFixedCSVs();
-  statusDiv.innerText = 'Fixed files loaded. Upload required files.';
 }
 
-generateBtn.addEventListener('click', async () => {
-  try {
-    statusDiv.innerText = 'Processing...';
+generateBtn.onclick = async () => {
+  const sales = parseFile(await loadFile(salesFile.files[0]));
+  const fbf = parseFile(await loadFile(fbfFile.files[0]));
+  const seller = parseFile(await loadFile(sellerFile.files[0]));
 
-    const sales = parseFile(await loadFile(salesInput.files[0]));
-    const fbf = parseFile(await loadFile(fbfInput.files[0]));
-    const seller = parseFile(await loadFile(sellerInput.files[0]));
+  validateSales(sales);
+  validateFBFStock(fbf);
+  validateSellerStock(seller);
 
-    validateSales(sales);
-    validateFBFStock(fbf);
-    validateSellerStock(seller);
+  const base = normalizeData({ sales, fbfStock: fbf, sellerStock: seller }, fixedData);
 
-    workingData = normalizeData(
-      { sales, fbfStock: fbf, sellerStock: seller },
-      fixedData
-    );
+  finalData = base.map(r => {
+    const sc = applyStockCover(r);
+    const decision = decide(sc);
+    const qty = calculateQuantities(sc, decision);
+    return {
+      ...qty,
+      decision,
+      remarks: getRemarks(qty, decision)
+    };
+  });
 
-    finalData = workingData.map(row => {
-      const withSC = applyStockCover(row);
-      const decision = decide(withSC);
-      const withQty = calculateQuantities(withSC, decision);
-      const remarks = getRemarks(withQty, decision);
+  renderTable(finalData);
+  statusDiv.innerText = `Report Generated: ${finalData.length} rows`;
+};
 
-      return {
-        ...withQty,
-        decision,
-        remarks
-      };
-    });
-
-    console.log('FINAL DATA (Phase 4):', finalData);
-
-    statusDiv.innerText =
-      `Phase 4 complete. ${finalData.length} rows processed.`;
-
-  } catch (err) {
-    console.error(err);
-    alert(err.message);
-    statusDiv.innerText = 'ERROR: ' + err.message;
-  }
-});
+document.getElementById('exportShipment').onclick = () => exportShipment(finalData);
+document.getElementById('exportRecall').onclick = () => exportRecall(finalData);
+document.getElementById('exportWorking').onclick = () => exportWholeWorking(finalData);
 
 init();
