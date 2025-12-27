@@ -2,6 +2,15 @@ const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
 
 export function calculateQuantities(row, decision) {
 
+  // 🔴 Seller / Uniware FC → No movement here
+  if (row.fc === UNIWARE_ONLY_FC) {
+    return {
+      ...row,
+      sendQty: 0,
+      recallQty: 0
+    };
+  }
+
   let sendQty = 0;
   let recallQty = 0;
 
@@ -16,11 +25,6 @@ export function calculateQuantities(row, decision) {
   if (decision === 'DISCUSS') {
     sendQty = Math.max(row.targetStock - row.currentFCStock, 0);
     recallQty = Math.max(row.currentFCStock - row.targetStock, 0);
-  }
-
-  // 🔴 STEP-1 RULE: No recall for Uniware-only FC
-  if (row.fc === UNIWARE_ONLY_FC) {
-    recallQty = 0;
   }
 
   return {
