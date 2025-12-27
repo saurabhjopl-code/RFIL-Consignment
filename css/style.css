@@ -43,16 +43,12 @@ th {
   background: #eee;
 }
 
-/* ===== v1.2 UI HIGHLIGHTS ===== */
-
 .decision-send {
-  background-color: #d4edda;
-  color: #155724;
+  background: #d4edda;
   font-weight: bold;
 }
 
 .recall-blocked {
-  background-color: #f8d7da;
-  color: #721c24;
+  background: #f8d7da;
   font-weight: bold;
 }
