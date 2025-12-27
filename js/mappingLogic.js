@@ -1,18 +1,9 @@
 export async function loadFixedCSVs() {
-  const skuMapping = await fetch('./data/seller_sku_vs_uniware_sku.csv')
-    .then(res => {
-      if (!res.ok) throw new Error('SKU mapping file not found');
-      return res.text();
-    });
-
-  const skuStatus = await fetch('./data/seller_sku_vs_status.csv')
-    .then(res => {
-      if (!res.ok) throw new Error('SKU status file not found');
-      return res.text();
-    });
+  const skuMap = await fetch('./data/seller_sku_vs_uniware_sku.csv').then(r => r.text());
+  const statusMap = await fetch('./data/seller_sku_vs_status.csv').then(r => r.text());
 
   return {
-    skuMapping,
-    skuStatus
+    skuMap,
+    statusMap
   };
 }
