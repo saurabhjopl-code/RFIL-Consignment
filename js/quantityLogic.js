@@ -1,8 +1,13 @@
+const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
+
 export function calculateQuantities(row, decision) {
 
-  // 🔴 CLOSED SKU → FULL RECALL
-  if (row.uniwareRemark &&
-      row.uniwareRemark.toLowerCase().includes('closed')) {
+  // CLOSED SKU → FULL RECALL (except Uniware-only FC)
+  if (
+    row.uniwareRemark &&
+    row.uniwareRemark.toLowerCase().includes('closed') &&
+    row.fc !== UNIWARE_ONLY_FC
+  ) {
     return {
       ...row,
       sendQty: 0,
@@ -10,34 +15,30 @@ export function calculateQuantities(row, decision) {
     };
   }
 
-  const targetStock = row.targetStock;
   let sendQty = 0;
   let recallQty = 0;
 
   if (decision === 'SEND') {
-    sendQty = Math.floor(
-      Math.max(targetStock - row.currentFCStock, 0)
-    );
+    sendQty = Math.max(row.targetStock - row.currentFCStock, 0);
   }
 
   if (decision === 'RECALL') {
-    recallQty = Math.floor(
-      Math.max(row.currentFCStock - targetStock, 0)
-    );
+    recallQty = Math.max(row.currentFCStock - row.targetStock, 0);
   }
 
   if (decision === 'DISCUSS') {
-    sendQty = Math.floor(
-      Math.max(targetStock - row.currentFCStock, 0)
-    );
-    recallQty = Math.floor(
-      Math.max(row.currentFCStock - targetStock, 0)
-    );
+    sendQty = Math.max(row.targetStock - row.currentFCStock, 0);
+    recallQty = Math.max(row.currentFCStock - row.targetStock, 0);
+  }
+
+  // 🔴 No recall for Uniware-only FC
+  if (row.fc === UNIWARE_ONLY_FC) {
+    recallQty = 0;
   }
 
   return {
     ...row,
-    sendQty,
-    recallQty
+    sendQty: Math.floor(sendQty),
+    recallQty: Math.floor(recallQty)
   };
 }
