@@ -5,22 +5,13 @@ function normalizeKey(key) {
     .toString()
     .toLowerCase()
     .replace(/\s+/g, '')
-    .replace(/[()]/g, ''); // 🔴 IMPORTANT FIX
-}
-
-function getExact(row, exactName) {
-  for (const k of Object.keys(row)) {
-    if (k.trim().toLowerCase() === exactName.toLowerCase()) {
-      return row[k];
-    }
-  }
-  return '';
+    .replace(/[()]/g, '');
 }
 
 function getLoose(row, keys) {
   for (const k of Object.keys(row)) {
     const nk = normalizeKey(k);
-    if (keys.some(x => nk.includes(x))) return row[k];
+    if (keys.every(x => nk.includes(x))) return row[k];
   }
   return '';
 }
@@ -28,7 +19,7 @@ function getLoose(row, keys) {
 export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
   /* ===============================
-     Seller → Uniware SKU mapping
+     1. Seller → Uniware SKU mapping
      =============================== */
   const sellerToUniware = {};
   fixedData.skuMap.split('\n').slice(1).forEach(r => {
@@ -39,36 +30,36 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Uniware Remark (Closed etc.)
+     2. Uniware Remark (Closed etc.)
      =============================== */
   const remarkMap = {};
   fixedData.statusMap.split('\n').slice(1).forEach(r => {
-    const [uniwareSKU, remark] = r.split(',');
-    if (uniwareSKU && remark) {
-      remarkMap[uniwareSKU.trim()] = remark.trim();
+    const [sku, remark] = r.split(',');
+    if (sku && remark) {
+      remarkMap[sku.trim()] = remark.trim();
     }
   });
 
   /* ===============================
-     ✅ FIXED: Uniware Stock
+     3. ✅ FIXED: Uniware Stock
      =============================== */
   const uniwareStock = {};
+
   sellerStock.forEach(r => {
-    const sku =
-      getLoose(r, ['skucode']) ||
-      getLoose(r, ['sku code']);
+    const uniwareSKU = getLoose(r, ['skucode']);
+    if (!uniwareSKU) return;
 
-    // 🔴 HARD MAP EXACT COLUMN
-    let qty = getExact(r, 'Available (ATP)');
+    // 🔴 Robust detection of Available (ATP)
+    const atp = Number(
+      getLoose(r, ['available', 'atp'])
+    ) || 0;
 
-    qty = Number(qty) || 0;
-    if (!sku) return;
-
-    uniwareStock[sku] = (uniwareStock[sku] || 0) + qty;
+    uniwareStock[uniwareSKU] =
+      (uniwareStock[uniwareSKU] || 0) + atp;
   });
 
   /* ===============================
-     FBF Stock (unchanged)
+     4. FBF Stock (unchanged)
      =============================== */
   const fbfMap = {};
   fbfStock.forEach(r => {
@@ -81,7 +72,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Sales (unchanged)
+     5. Sales (unchanged)
      =============================== */
   const salesMap = {};
   sales.forEach(r => {
@@ -97,7 +88,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
   });
 
   /* ===============================
-     Build Working Dataset
+     6. Build Working Dataset
      =============================== */
   const working = [];
   const keys = new Set([
@@ -112,7 +103,7 @@ export function normalizeData({ sales, fbfStock, sellerStock }, fixedData) {
 
     let currentFCStock = fbfMap[key] || 0;
 
-    // 🔴 Uniware-only FC
+    // 🔴 Uniware-only FC logic
     if (fc === UNIWARE_ONLY_FC) {
       currentFCStock = uniStock;
     }
