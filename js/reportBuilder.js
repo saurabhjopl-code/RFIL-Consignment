@@ -2,35 +2,27 @@ export function renderTable(data) {
   const container = document.getElementById('tableContainer');
   container.innerHTML = '';
 
-  // Sort by 30D Sale DESC
   data.sort((a, b) => b.gross30DSale - a.gross30DSale);
 
-  const fcGroups = {};
+  const groups = {};
   data.forEach(r => {
-    if (!fcGroups[r.fc]) fcGroups[r.fc] = [];
-    fcGroups[r.fc].push(r);
+    if (!groups[r.fc]) groups[r.fc] = [];
+    groups[r.fc].push(r);
   });
 
-  Object.keys(fcGroups).forEach(fc => {
-    const section = document.createElement('div');
-    section.style.marginBottom = '16px';
-
+  Object.keys(groups).forEach(fc => {
     const header = document.createElement('div');
+    header.innerText = `FC: ${fc} (Rows: ${groups[fc].length})`;
     header.style.fontWeight = 'bold';
     header.style.cursor = 'pointer';
-    header.style.padding = '8px';
-    header.style.background = '#f0f0f0';
-    header.innerText =
-      fc === 'LOC979d1d9aca154ae0a5d72fc1a199aece'
-        ? `Seller FC (Non-FBF) – Rows: ${fcGroups[fc].length}`
-        : `FC: ${fc} – Rows: ${fcGroups[fc].length}`;
+    header.style.padding = '6px';
+    header.style.background = '#eee';
 
     const wrapper = document.createElement('div');
     wrapper.style.display = 'none';
 
     header.onclick = () => {
-      wrapper.style.display =
-        wrapper.style.display === 'none' ? 'block' : 'none';
+      wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
     };
 
     const table = document.createElement('table');
@@ -40,27 +32,37 @@ export function renderTable(data) {
           <th>SKU</th>
           <th>Current Stock</th>
           <th>30D Sale</th>
-          <th>Suggested Target FC</th>
+          <th>Stock Cover</th>
+          <th>Decision</th>
+          <th>Send Qty</th>
+          <th>Recall Qty</th>
+          <th>Target FC</th>
+          <th>Remarks</th>
         </tr>
       </thead>
       <tbody>
-        ${fcGroups[fc]
-          .map(
-            r => `
-          <tr>
+        ${groups[fc].map(r => `
+          <tr style="background:${
+            r.decision === 'RECALL' ? '#f8d7da' :
+            r.decision === 'DISCUSS' ? '#fff3cd' :
+            r.decision === 'SEND' ? '#d4edda' : '#e2e3e5'
+          }">
             <td>${r.sellerSKU}</td>
             <td>${r.currentFCStock}</td>
             <td>${r.gross30DSale}</td>
+            <td>${r.stockCover ?? '-'}</td>
+            <td>${r.decision}</td>
+            <td>${r.sendQty}</td>
+            <td>${r.recallQty}</td>
             <td>${r.targetFC || '-'}</td>
-          </tr>`
-          )
-          .join('')}
+            <td>${r.remarks}</td>
+          </tr>
+        `).join('')}
       </tbody>
     `;
 
     wrapper.appendChild(table);
-    section.appendChild(header);
-    section.appendChild(wrapper);
-    container.appendChild(section);
+    container.appendChild(header);
+    container.appendChild(wrapper);
   });
 }
