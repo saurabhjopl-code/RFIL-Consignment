@@ -2,44 +2,65 @@ function normalizeKey(key) {
   return key
     .toString()
     .trim()
-    .replace(/\s+/g, ' ');
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[\(\)\-]/g, '');
 }
 
-function hasColumns(row, requiredCols) {
-  const normalizedRowKeys = Object.keys(row).map(normalizeKey);
-  const normalizedRequired = requiredCols.map(normalizeKey);
-
-  return normalizedRequired.every(req =>
-    normalizedRowKeys.includes(req)
-  );
+/**
+ * Check if at least one alias exists in row headers
+ */
+function hasColumnAlias(row, aliases) {
+  const headers = Object.keys(row).map(normalizeKey);
+  return aliases.some(a => headers.includes(normalizeKey(a)));
 }
 
 export function validateSales(data) {
-  const required = ['SKU ID', 'Location Id', 'Gross Units', 'Return Units'];
-  if (!hasColumns(data[0], required)) {
-    console.error('Sales headers found:', Object.keys(data[0]));
+  const row = data[0];
+
+  if (
+    !hasColumnAlias(row, ['sku id']) ||
+    !hasColumnAlias(row, ['location id']) ||
+    !hasColumnAlias(row, ['gross units']) ||
+    !hasColumnAlias(row, ['return units'])
+  ) {
+    console.error('Sales headers found:', Object.keys(row));
     throw new Error(
-      'Sales file columns mismatch. Required: ' + required.join(', ')
+      'Sales file columns mismatch. Required: SKU ID, Location Id, Gross Units, Return Units'
     );
   }
 }
 
 export function validateFBFStock(data) {
-  const required = ['Warehouse Id', 'SKU', 'Live on Website (FBF Stock)'];
-  if (!hasColumns(data[0], required)) {
-    console.error('FBF headers found:', Object.keys(data[0]));
+  const row = data[0];
+
+  if (
+    !hasColumnAlias(row, ['warehouse id']) ||
+    !hasColumnAlias(row, ['sku']) ||
+    !hasColumnAlias(row, [
+      'live on website fbf stock',
+      'live on website fbfstock',
+      'live on website stock',
+      'live on website'
+    ])
+  ) {
+    console.error('FBF headers found:', Object.keys(row));
     throw new Error(
-      'FBF Stock file columns mismatch. Required: ' + required.join(', ')
+      'FBF Stock file columns mismatch. Required: Warehouse Id, SKU, Live on Website (FBF Stock)'
     );
   }
 }
 
 export function validateSellerStock(data) {
-  const required = ['Seller SKU', 'Available Stock'];
-  if (!hasColumns(data[0], required)) {
-    console.error('Seller headers found:', Object.keys(data[0]));
+  const row = data[0];
+
+  if (
+    !hasColumnAlias(row, ['seller sku']) ||
+    !hasColumnAlias(row, ['available stock'])
+  ) {
+    console.error('Seller headers found:', Object.keys(row));
     throw new Error(
-      'Seller Stock file columns mismatch. Required: ' + required.join(', ')
+      'Seller Stock file columns mismatch. Required: Seller SKU, Available Stock'
     );
   }
 }
