@@ -1,9 +1,11 @@
 export function getRemarks(row, decision) {
-  const remarks = [];
 
-  if (row.uniwareStatus === 'CLOSE') {
-    remarks.push('Uniware SKU closed');
+  // 🔴 CLOSED SKU REMARK
+  if (row.uniwareRemark && row.uniwareRemark.toLowerCase().includes('closed')) {
+    return 'Closed SKU';
   }
+
+  const remarks = [];
 
   if (row.sellerStock < 10) {
     remarks.push('Seller stock below minimum threshold');
@@ -14,7 +16,7 @@ export function getRemarks(row, decision) {
   }
 
   if (row.gsv === 0) {
-    remarks.push('Non-moving SKU (0 sales in 30 days)');
+    remarks.push('Non-moving SKU');
   }
 
   if (row.stockCover < 30) {
