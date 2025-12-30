@@ -1,16 +1,18 @@
-const UNIWARE_ONLY_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
+const SELLER_FC = 'LOC979d1d9aca154ae0a5d72fc1a199aece';
 
 export function calculateQuantities(row, decision) {
 
-  // 🔴 Seller / Uniware FC → No movement here
-  if (row.fc === UNIWARE_ONLY_FC) {
+  // 🔴 Seller (Surat) FC → Uniware-backed SEND logic
+  if (row.fc === SELLER_FC) {
+    const sendQty = Math.max(row.targetStock - row.currentFCStock, 0);
     return {
       ...row,
-      sendQty: 0,
+      sendQty: Math.floor(sendQty),
       recallQty: 0
     };
   }
 
+  // Existing logic untouched
   let sendQty = 0;
   let recallQty = 0;
 
